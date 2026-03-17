@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   backfillMessagesAfterCursorAction,
   hydrateRealtimeMessageAction,
+  loadOlderMessagesPageAction,
 } from "@/lib/actions/messages";
 import { logError, logInfo } from "@/lib/logging/app-logger";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -13,6 +14,7 @@ import {
   mergeRenderedMessages,
   type RenderedMessage,
 } from "@/lib/messages/rendered-message";
+import type { MessageListCursor } from "@/lib/messages/list-messages";
 
 import { MessageList } from "./message-list";
 
@@ -134,21 +136,49 @@ function showBrowserNotification(message: RenderedMessage, currentUserId: string
 export function LiveMessageList({
   currentUserId,
   initialMessages,
-  hasMore,
-  loadedPages,
+  initialHasMore,
+  initialCursor,
+  scrollContainerRef,
   onRealtimeInsert,
 }: {
   currentUserId: string;
   initialMessages: RenderedMessage[];
-  hasMore: boolean;
-  loadedPages: number;
+  initialHasMore: boolean;
+  initialCursor: MessageListCursor | null;
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
   onRealtimeInsert?: (message: RenderedMessage) => void;
 }) {
   const [realtimeMessages, setRealtimeMessages] = useState<RenderedMessage[]>([]);
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
+  const [historyMessages, setHistoryMessages] = useState<RenderedMessage[]>(() => initialMessages);
+  const [cursor, setCursor] = useState<MessageListCursor | null>(initialCursor);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [connectionLost, setConnectionLost] = useState(false);
+
+  const pendingScrollRestoreRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(
+    null,
+  );
+
+  useLayoutEffect(() => {
+    const pending = pendingScrollRestoreRef.current;
+    if (!pending) {
+      return;
+    }
+
+    const node = scrollContainerRef?.current ?? null;
+    if (!node) {
+      pendingScrollRestoreRef.current = null;
+      return;
+    }
+
+    const delta = node.scrollHeight - pending.prevScrollHeight;
+    node.scrollTop = pending.prevScrollTop + delta;
+    pendingScrollRestoreRef.current = null;
+  }, [historyMessages, scrollContainerRef]);
+
   const messages = useMemo(() => {
-    const merged = mergeRenderedMessages(initialMessages, realtimeMessages);
+    const merged = mergeRenderedMessages(historyMessages, realtimeMessages);
 
     if (deletedMessageIds.length === 0) {
       return merged;
@@ -156,7 +186,7 @@ export function LiveMessageList({
 
     const deletedIdSet = new Set(deletedMessageIds);
     return merged.filter((message) => !deletedIdSet.has(message.id));
-  }, [initialMessages, realtimeMessages, deletedMessageIds]);
+  }, [historyMessages, realtimeMessages, deletedMessageIds]);
   const latestMessage = useMemo(() => {
     if (messages.length === 0) {
       return null;
@@ -310,6 +340,27 @@ export function LiveMessageList({
     };
   }, [currentUserId, onRealtimeInsert]);
 
+  const handleLoadOlder = useCallback(() => {
+    if (!hasMore || loadingOlder) {
+      return;
+    }
+
+    const node = scrollContainerRef?.current ?? null;
+    if (node) {
+      pendingScrollRestoreRef.current = { prevScrollHeight: node.scrollHeight, prevScrollTop: node.scrollTop };
+    }
+
+    setLoadingOlder(true);
+    void (async () => {
+      const page = await loadOlderMessagesPageAction({ cursor });
+
+      setHistoryMessages((current) => mergeRenderedMessages(page.messages, current));
+      setCursor(page.nextCursor);
+      setHasMore(page.nextCursor !== null);
+      setLoadingOlder(false);
+    })();
+  }, [cursor, hasMore, loadingOlder, scrollContainerRef]);
+
   return (
     <div className="mt-4 space-y-4">
       {connectionLost ? (
@@ -318,7 +369,12 @@ export function LiveMessageList({
         </p>
       ) : null}
 
-      <MessageList hasMore={hasMore} loadedPages={loadedPages} messages={messages} />
+      <MessageList
+        hasMore={hasMore}
+        loadingOlder={loadingOlder}
+        messages={messages}
+        onLoadOlder={handleLoadOlder}
+      />
     </div>
   );
 }

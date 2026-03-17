@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { MessageListCursor } from "@/lib/messages/list-messages";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
@@ -44,24 +44,55 @@ export function ChatShell({
   const didInitialScrollRef = useRef(false);
   const isAtBottomRef = useRef(true);
 
-  const [cursor] = useState<MessageListCursor | null>(initialCursor);
-  const [hasMore] = useState(initialHasMore);
-  const [loadingMore] = useState(false);
-
   const [unseenCount, setUnseenCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
   const [editDraft] = useState<ChatEditDraft>(null);
   const [modalState] = useState<ChatModalState>(null);
 
-  void cursor;
-  void loadingMore;
   void unseenCount;
   void isAtBottom;
   void editDraft;
   void modalState;
   void composerRef;
   void latestInsertRef;
+  void initialLoadedPages;
+  void initialCursor;
+
+  useLayoutEffect(() => {
+    const scrollNode = scrollRef.current;
+    const composerNode = composerRef.current;
+
+    if (!scrollNode || !composerNode) {
+      return;
+    }
+
+    const applyPadding = () => {
+      const scrollRect = scrollNode.getBoundingClientRect();
+      const composerRect = composerNode.getBoundingClientRect();
+
+      // Если композер перекрывает scroll-область (overlay), добавляем ровно высоту перекрытия.
+      const overlap = Math.max(0, scrollRect.bottom - composerRect.top);
+      scrollNode.style.paddingBottom = overlap > 0 ? `${overlap}px` : "";
+    };
+
+    applyPadding();
+
+    const resizeObserver = new ResizeObserver(() => {
+      applyPadding();
+    });
+
+    resizeObserver.observe(composerNode);
+    resizeObserver.observe(scrollNode);
+
+    window.addEventListener("resize", applyPadding);
+
+    return () => {
+      window.removeEventListener("resize", applyPadding);
+      resizeObserver.disconnect();
+      scrollNode.style.paddingBottom = "";
+    };
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     const node = scrollRef.current;
@@ -174,9 +205,10 @@ export function ChatShell({
         >
           <LiveMessageList
             currentUserId={currentUserId}
-            hasMore={hasMore}
+            initialCursor={initialCursor}
+            initialHasMore={initialHasMore}
             initialMessages={initialMessages}
-            loadedPages={initialLoadedPages}
+            scrollContainerRef={scrollRef}
             onRealtimeInsert={handleRealtimeInsert}
           />
 
