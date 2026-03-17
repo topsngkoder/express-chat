@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type ChangeEvent } from "react";
+import { useRef, useState, useTransition, useEffect, type ChangeEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { createMessageFormAction, type MessageComposerState } from "@/lib/actions/messages";
@@ -27,6 +27,12 @@ export type ComposerFeedback =
     }
   | null;
 
+/** Высота одной строки textarea (text-sm leading-5 ≈ 20px). */
+const TEXTAREA_LINE_HEIGHT_PX = 20;
+/** Максимум строк без внутреннего скролла (далее overflow). */
+const TEXTAREA_MAX_LINES = 5;
+const TEXTAREA_MAX_HEIGHT_PX = TEXTAREA_LINE_HEIGHT_PX * TEXTAREA_MAX_LINES + 16; // + py-2
+
 function formatFileSize(size: number): string {
   if (size < 1024 * 1024) {
     return `${Math.max(1, Math.round(size / 1024))} КБ`;
@@ -42,6 +48,7 @@ export function MessageComposer({
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [pending, startTransition] = useTransition();
   const [text, setText] = useState("");
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
@@ -50,6 +57,28 @@ export function MessageComposer({
 
   const hasContent = text.trim().length > 0 || selectedImage !== null;
   const errorMessage = clientError ?? serverState.error;
+
+  function adjustTextareaHeight() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    const h = Math.max(40, Math.min(ta.scrollHeight, TEXTAREA_MAX_HEIGHT_PX));
+    ta.style.height = `${h}px`;
+    ta.style.overflowY = ta.scrollHeight > TEXTAREA_MAX_HEIGHT_PX ? "auto" : "hidden";
+  }
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [text]);
+
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter") return;
+    if (event.shiftKey) return; // Shift+Enter — новая строка
+    event.preventDefault();
+    if (!hasContent || pending) return;
+    const form = event.currentTarget.form;
+    if (form) form.requestSubmit();
+  }
 
   function handleSelectImage() {
     fileInputRef.current?.click();
@@ -187,7 +216,8 @@ export function MessageComposer({
         </button>
 
         <textarea
-          className="h-10 min-h-10 max-h-[160px] w-full flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-[#E6EEF7] outline-none placeholder:text-[#607382] disabled:cursor-not-allowed disabled:opacity-60"
+          ref={textareaRef}
+          className="min-h-10 w-full flex-1 resize-none overflow-y-hidden bg-transparent px-2 py-2 text-sm leading-5 text-[#E6EEF7] outline-none placeholder:text-[#607382] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
           id="message-text"
           maxLength={1000}
@@ -197,6 +227,7 @@ export function MessageComposer({
             setText(event.currentTarget.value);
             setServerState(initialMessageComposerState);
           }}
+          onKeyDown={handleTextareaKeyDown}
           placeholder="Сообщение..."
           value={text}
         />
