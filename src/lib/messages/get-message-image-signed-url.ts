@@ -30,6 +30,12 @@ function normalizeChatImagePath(imagePath: string): string {
   return normalizedPath;
 }
 
+function isStorageNotFoundError(err: unknown): boolean {
+  if (err === null || typeof err !== "object") return false;
+  const msg = String((err as { message?: unknown }).message ?? "").toLowerCase();
+  return msg.includes("not found") || msg.includes("object not found");
+}
+
 export const getMessageImageSignedUrl = cache(
   async (imagePath: string | null): Promise<string | null> => {
     await requireConfirmedUser();
@@ -48,14 +54,14 @@ export const getMessageImageSignedUrl = cache(
         .createSignedUrl(normalizedPath, SIGNED_URL_TTL_SECONDS);
 
       if (error) {
+        if (isStorageNotFoundError(error)) {
+          return null;
+        }
         throw mapSupabaseError(error);
       }
 
       if (!data?.signedUrl) {
-        throw new AppError({
-          code: "UPSTREAM",
-          publicMessage: SIGNED_URL_ERROR_MESSAGE,
-        });
+        return null;
       }
 
       return data.signedUrl;
