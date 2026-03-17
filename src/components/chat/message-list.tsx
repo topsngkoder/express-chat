@@ -9,12 +9,46 @@ type MessageListProps = {
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
-  dateStyle: "medium",
-  timeStyle: "short",
+  hour: "2-digit",
+  minute: "2-digit",
 });
 
-function formatMessageDate(value: string): string {
+function formatMessageTime(value: string): string {
   return dateTimeFormatter.format(new Date(value));
+}
+
+function getInitials(senderName: string): string {
+  const trimmed = senderName.trim();
+  if (!trimmed) {
+    return "?";
+  }
+
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const first = parts.at(0)?.[0] ?? "?";
+  const second = parts.length > 1 ? parts.at(1)?.[0] ?? "" : parts.at(0)?.[1] ?? "";
+  const result = `${first}${second}`.toUpperCase();
+  return result.length > 0 ? result : "?";
+}
+
+const SENDER_NAME_COLORS = [
+  "#F07474",
+  "#F4A261",
+  "#E9C46A",
+  "#2A9D8F",
+  "#3A86FF",
+  "#8338EC",
+  "#FF006E",
+  "#4CC9F0",
+] as const;
+
+function hashSenderIdToColor(senderId: string): string {
+  let hash = 0;
+  for (let i = 0; i < senderId.length; i += 1) {
+    hash = (hash * 31 + senderId.charCodeAt(i)) | 0;
+  }
+
+  const index = Math.abs(hash) % SENDER_NAME_COLORS.length;
+  return SENDER_NAME_COLORS[index] ?? SENDER_NAME_COLORS[0];
 }
 
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -107,37 +141,82 @@ export function MessageList({
               ? "before:absolute before:bottom-[6px] before:right-[-6px] before:h-3 before:w-3 before:rotate-45 before:rounded-sm before:bg-[#2B5278]"
               : "before:absolute before:bottom-[6px] before:left-[-6px] before:h-3 before:w-3 before:rotate-45 before:rounded-sm before:bg-[#182533]"
             : "";
+          const showAvatar = !meta.isOutgoing && meta.isGroupStart;
+          const reserveAvatarSpace = !meta.isOutgoing;
+          const shouldShowSenderName = !meta.isOutgoing && meta.isGroupStart;
+          const senderNameColor = shouldShowSenderName ? hashSenderIdToColor(message.senderId) : null;
+          const isImageOnly = Boolean(message.image) && !message.text;
+          const bubblePaddingClass = isImageOnly ? "p-1" : "px-2.5 py-2";
 
           return (
             <div key={message.id} className={`${spacingClass} flex ${alignmentClass}`}>
-              <article
-                data-group-start={meta.isGroupStart ? "true" : "false"}
-                data-group-end={meta.isGroupEnd ? "true" : "false"}
-                data-outgoing={meta.isOutgoing ? "true" : "false"}
-                className={`relative max-w-[78%] rounded-2xl ${bubbleColor} px-2.5 py-2 text-[#E6EEF7] sm:max-w-[62%] ${tailClass}`}
-              >
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                  <p className="break-all text-sm font-medium">{message.senderName}</p>
-                  <time className="text-sm text-[#8FA1B3]" dateTime={message.createdAt}>
-                    {formatMessageDate(message.createdAt)}
-                  </time>
-                </div>
-
-                {message.text ? (
-                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
-                ) : null}
-
-                {message.image ? (
-                  <div className="mt-2 overflow-hidden rounded-xl">
-                    <img
-                      alt={message.image.alt}
-                      className="block max-h-[28rem] w-full object-contain"
-                      loading="lazy"
-                      src={message.image.url}
-                    />
+              <div className={`flex items-end ${meta.isOutgoing ? "" : "gap-2"}`}>
+                {reserveAvatarSpace ? (
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+                    {showAvatar ? (
+                      message.senderAvatarUrl ? (
+                        <img
+                          alt={message.senderName}
+                          className="h-8 w-8 rounded-full object-cover"
+                          loading="lazy"
+                          src={message.senderAvatarUrl}
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#22303D] text-xs font-semibold text-[#E6EEF7]">
+                          {getInitials(message.senderName)}
+                        </div>
+                      )
+                    ) : null}
                   </div>
                 ) : null}
-              </article>
+
+                <div className="flex min-w-0 flex-col">
+                  {shouldShowSenderName ? (
+                    <p
+                      className="mb-1 truncate text-xs font-semibold leading-4"
+                      style={{ color: senderNameColor ?? undefined }}
+                    >
+                      {message.senderName}
+                    </p>
+                  ) : null}
+
+                  <article
+                    data-group-start={meta.isGroupStart ? "true" : "false"}
+                    data-group-end={meta.isGroupEnd ? "true" : "false"}
+                    data-outgoing={meta.isOutgoing ? "true" : "false"}
+                    className={`relative max-w-[78%] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62%] ${tailClass}`}
+                  >
+                    {message.text ? (
+                      <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
+                    ) : null}
+
+                    {message.image ? (
+                      <div className={message.text ? "mt-2 overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
+                        <img
+                          alt={message.image.alt}
+                          className="block max-h-[320px] w-full rounded-xl object-contain sm:max-h-[420px]"
+                          loading="lazy"
+                          src={message.image.url}
+                        />
+                      </div>
+                    ) : null}
+
+                    <div
+                      className={`mt-1 flex items-center justify-end gap-1 text-[11px] leading-4 ${
+                        meta.isOutgoing ? "text-[#B7C9DA]" : "text-[#8FA1B3]"
+                      }`}
+                    >
+                      <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                      {meta.isOutgoing && message.updatedAt ? <span className="ml-1">изменено</span> : null}
+                      {meta.isOutgoing ? (
+                        <span aria-hidden="true" className="select-none">
+                          ✓✓
+                        </span>
+                      ) : null}
+                    </div>
+                  </article>
+                </div>
+              </div>
             </div>
           );
         })}
