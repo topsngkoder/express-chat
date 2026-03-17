@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { deleteMessageAction } from "@/lib/actions/messages";
+import { deleteMessageAction, editMessageAction } from "@/lib/actions/messages";
 import type { MessageListCursor } from "@/lib/messages/list-messages";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
 
@@ -22,6 +22,7 @@ type ChatEditDraft =
   | {
       messageId: string;
       initialText: string | null;
+      editingMessageHasImage: boolean;
     }
   | null;
 
@@ -49,14 +50,13 @@ export function ChatShell({
   const [unseenCount, setUnseenCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
-  const [editDraft] = useState<ChatEditDraft>(null);
+  const [editDraft, setEditDraft] = useState<ChatEditDraft>(null);
   const [modalState, setModalState] = useState<ChatModalState>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   void unseenCount;
   void isAtBottom;
-  void editDraft;
   void composerRef;
   void latestInsertRef;
   void initialLoadedPages;
@@ -191,6 +191,25 @@ export function ChatShell({
     }
   }, []);
 
+  const handleRequestEdit = useCallback(
+    (messageId: string, initialText: string | null, hasImage: boolean) => {
+      setEditDraft({ messageId, initialText, editingMessageHasImage: hasImage });
+    },
+    [],
+  );
+
+  const handleSaveEdit = useCallback(async (text: string) => {
+    if (!editDraft) return;
+    const result = await editMessageAction(editDraft.messageId, text);
+    if (!result.success) {
+      throw new Error(result.error ?? "Не удалось сохранить изменения. Попробуйте позже");
+    }
+  }, [editDraft]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditDraft(null);
+  }, []);
+
   return (
     <main className="dark h-dvh overflow-hidden bg-[#0E1621] text-[#E6EEF7]">
       <div className="mx-auto flex h-full w-full max-w-[960px] flex-col">
@@ -240,6 +259,7 @@ export function ChatShell({
             initialMessages={initialMessages}
             scrollContainerRef={scrollRef}
             onRealtimeInsert={handleRealtimeInsert}
+            onEditMessage={handleRequestEdit}
             onDeleteMessage={handleRequestDelete}
           />
 
@@ -266,7 +286,19 @@ export function ChatShell({
           className="shrink-0 border-t border-[#22303D] bg-[#17212B] px-3 py-2 sm:px-4"
         >
           <div className="max-h-[160px] overflow-y-auto">
-            <MessageComposer />
+            {editDraft ? (
+              <MessageComposer
+                key={`edit-${editDraft.messageId}`}
+                mode="edit"
+                editingMessageId={editDraft.messageId}
+                initialText={editDraft.initialText}
+                editingMessageHasImage={editDraft.editingMessageHasImage}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={handleCancelEdit}
+              />
+            ) : (
+              <MessageComposer key="compose" />
+            )}
           </div>
         </footer>
       </div>

@@ -11,7 +11,7 @@ type MessageListProps = {
   hasMore: boolean;
   loadingOlder?: boolean;
   onLoadOlder?: () => void;
-  onEditMessage?: (messageId: string) => void;
+  onEditMessage?: (messageId: string, initialText: string | null, hasImage: boolean) => void;
   onDeleteMessage?: (messageId: string) => void;
 };
 
@@ -320,7 +320,7 @@ export function MessageList({
                               type="button"
                               className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#2B5278]"
                               aria-label="Редактировать сообщение"
-                              onClick={() => onEditMessage?.(message.id)}
+                              onClick={() => onEditMessage?.(message.id, message.text ?? null, !!message.image)}
                             >
                               <IconPencil16 />
                             </button>
@@ -338,7 +338,11 @@ export function MessageList({
                         )}
                         <div className="flex shrink-0 items-center gap-1">
                           <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
-                          {meta.isOutgoing && message.updatedAt ? <span className="ml-1">изменено</span> : null}
+                          {meta.isOutgoing && message.updatedAt ? (
+                            <span className="ml-1">
+                              изменено в {formatMessageTime(message.updatedAt)}
+                            </span>
+                          ) : null}
                           {meta.isOutgoing ? (
                             <span aria-hidden="true" className="select-none">
                               ✓✓
@@ -360,7 +364,7 @@ export function MessageList({
                           role="menuitem"
                           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#22303D] focus:bg-[#22303D] focus:outline-none"
                           onClick={() => {
-                            onEditMessage?.(message.id);
+                            onEditMessage?.(message.id, message.text ?? null, !!message.image);
                             setContextMenuMessageId(null);
                           }}
                         >

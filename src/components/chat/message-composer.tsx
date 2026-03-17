@@ -163,8 +163,12 @@ export function MessageComposer(props: MessageComposerProps) {
     }
     setClientError(null);
     startTransition(async () => {
-      await editProps!.onSaveEdit(trimmed);
-      editProps!.onCancelEdit();
+      try {
+        await editProps!.onSaveEdit(trimmed);
+        editProps!.onCancelEdit();
+      } catch (e) {
+        setClientError(e instanceof Error ? e.message : "Не удалось сохранить изменения");
+      }
     });
   }
 

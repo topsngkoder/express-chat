@@ -230,6 +230,66 @@ export async function loadOlderMessagesPageAction(input: LoadOlderMessagesPageIn
 }
 
 const DELETE_MESSAGE_ERROR = "Не удалось удалить сообщение. Попробуйте позже";
+const EDIT_MESSAGE_ERROR = "Не удалось сохранить изменения. Попробуйте позже";
+
+export type EditMessageResult = {
+  success: boolean;
+  error: string | null;
+};
+
+export async function editMessageAction(messageId: string, text: string): Promise<EditMessageResult> {
+  try {
+    const { id: userId } = await requireConfirmedUser();
+
+    if (!messageId?.trim() || typeof text !== "string") {
+      return { success: false, error: EDIT_MESSAGE_ERROR };
+    }
+
+    const trimmed = text.trim();
+
+    const supabase = await createSupabaseServerClient();
+
+    const { data: existing } = await supabase
+      .from("messages")
+      .select("id, text, sender_id")
+      .eq("id", messageId.trim())
+      .single();
+
+    if (!existing || existing.sender_id !== userId) {
+      return { success: false, error: EDIT_MESSAGE_ERROR };
+    }
+
+    if ((existing.text ?? "").trim() === trimmed) {
+      revalidatePath("/chat");
+      return { success: true, error: null };
+    }
+
+    const { error } = await supabase
+      .from("messages")
+      .update({ text: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", messageId.trim())
+      .eq("sender_id", userId);
+
+    if (error) {
+      console.error("[editMessageAction] Supabase error:", error.message, error.code, error.details);
+      const message =
+        process.env.NODE_ENV === "development"
+          ? `${EDIT_MESSAGE_ERROR} (${error.message})`
+          : EDIT_MESSAGE_ERROR;
+      return { success: false, error: message };
+    }
+
+    revalidatePath("/chat");
+    return { success: true, error: null };
+  } catch (err) {
+    console.error("[editMessageAction] Unexpected error:", err);
+    const message =
+      process.env.NODE_ENV === "development" && err instanceof Error
+        ? `${EDIT_MESSAGE_ERROR} (${err.message})`
+        : EDIT_MESSAGE_ERROR;
+    return { success: false, error: message };
+  }
+}
 
 export type DeleteMessageResult = {
   success: boolean;
@@ -238,7 +298,7 @@ export type DeleteMessageResult = {
 
 export async function deleteMessageAction(messageId: string): Promise<DeleteMessageResult> {
   try {
-    const { user } = await requireConfirmedUser();
+    const { id: userId } = await requireConfirmedUser();
 
     if (!messageId || typeof messageId !== "string" || messageId.trim() === "") {
       return { success: false, error: DELETE_MESSAGE_ERROR };
@@ -250,7 +310,7 @@ export async function deleteMessageAction(messageId: string): Promise<DeleteMess
       .from("messages")
       .delete()
       .eq("id", messageId.trim())
-      .eq("sender_id", user.id);
+      .eq("sender_id", userId);
 
     if (error) {
       return { success: false, error: DELETE_MESSAGE_ERROR };
