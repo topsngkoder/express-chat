@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { MessageComposer, type ComposerFeedback } from "@/components/chat/message-composer";
-import { NotificationPermissionCard } from "@/components/chat/notification-permission-card";
 
 const toneClassName: Record<NonNullable<ComposerFeedback>["tone"], string> = {
   info: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/40 dark:text-sky-300",
@@ -27,29 +26,12 @@ export function ChatFeedbackSections() {
         </div>
 
         <MessageComposer onFeedbackChange={setFeedback} />
-      </section>
 
-      <NotificationPermissionCard />
-
-      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Системные уведомления</h2>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Здесь отображаются ошибки отправки и текущие состояния формы.
+        {feedback ? (
+          <p className={`mt-4 rounded-xl border px-4 py-3 text-sm ${toneClassName[feedback.tone]}`}>
+            {feedback.message}
           </p>
-        </div>
-
-        <div className="mt-4">
-          {feedback ? (
-            <p className={`rounded-xl border px-4 py-3 text-sm ${toneClassName[feedback.tone]}`}>
-              {feedback.message}
-            </p>
-          ) : (
-            <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-400">
-              Пока нет новых уведомлений. Ошибки отправки и статусы формы появятся здесь.
-            </p>
-          )}
-        </div>
+        ) : null}
       </section>
     </>
   );

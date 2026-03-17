@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
-import { LogoutButton } from "@/components/auth/logout-button";
 import { ChatFeedbackSections } from "@/components/chat/chat-feedback-sections";
 import { LiveMessageList } from "@/components/chat/live-message-list";
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
+import { getOrCreateCurrentProfile } from "@/lib/profile/profile-service";
 import { renderMessagesForChat } from "@/lib/messages/render-message";
 import { listMessagesPage, type MessageListItem } from "@/lib/messages/list-messages";
 
@@ -39,6 +40,12 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   const params = searchParams ? await searchParams : undefined;
   const historyPages = parseHistoryPages(params?.historyPages);
   const user = await requireConfirmedUser();
+  const profile = await getOrCreateCurrentProfile();
+  const displayName =
+    (profile.displayName?.trim() && profile.displayName.trim().length > 0)
+      ? profile.displayName.trim()
+      : null;
+  const userDisplayName = displayName ?? user.email;
   let nextCursor: Awaited<ReturnType<typeof listMessagesPage>>["nextCursor"] = null;
   const loadedItems: MessageListItem[] = [];
 
@@ -68,9 +75,17 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     <main className="min-h-screen bg-zinc-50 px-3 py-4 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 sm:px-4 sm:py-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         <header className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <h1 className="text-2xl font-semibold sm:text-3xl">Экспресс-чат</h1>
-            <LogoutButton className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800" />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-2xl font-semibold sm:text-3xl">Экспресс-чат</h1>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{userDisplayName}</p>
+            </div>
+            <Link
+              href="/settings"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800"
+            >
+              Настройки
+            </Link>
           </div>
         </header>
 

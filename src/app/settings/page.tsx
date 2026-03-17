@@ -3,6 +3,7 @@ import Link from "next/link";
 import { isRedirectError } from "next/navigation";
 
 import { LogoutButton } from "@/components/auth/logout-button";
+import { NotificationPermissionCard } from "@/components/chat/notification-permission-card";
 import { ProfileBlock } from "@/components/settings/profile-block";
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
 import { getOrCreateCurrentProfile, getAvatarSignedUrl } from "@/lib/profile/profile-service";
@@ -77,17 +78,7 @@ export default async function SettingsPage() {
           userEmail={user.email}
         />
 
-        <section
-          className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6"
-          aria-labelledby="notifications-heading"
-        >
-          <h2 id="notifications-heading" className="text-lg font-semibold">
-            Уведомления
-          </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Разрешения для браузерных уведомлений.
-          </p>
-        </section>
+        <NotificationPermissionCard />
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
           <LogoutButton className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800" />
