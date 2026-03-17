@@ -184,7 +184,7 @@ export function MessageList({
                     data-group-start={meta.isGroupStart ? "true" : "false"}
                     data-group-end={meta.isGroupEnd ? "true" : "false"}
                     data-outgoing={meta.isOutgoing ? "true" : "false"}
-                    className={`relative max-w-[78%] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62%] ${tailClass}`}
+                    className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass}`}
                   >
                     {message.text ? (
                       <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
