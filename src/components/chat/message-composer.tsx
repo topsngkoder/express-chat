@@ -10,6 +10,23 @@ import {
   MAX_IMAGE_SIZE_BYTES,
 } from "@/lib/validation/image";
 
+export type ComposerMode = "compose" | "edit";
+
+export type MessageComposerEditProps = {
+  mode: "edit";
+  editingMessageId: string;
+  initialText: string | null;
+  /** При редактировании: разрешить пустой текст, если у сообщения есть изображение */
+  editingMessageHasImage?: boolean;
+  onSaveEdit: (text: string) => void | Promise<void>;
+  onCancelEdit: () => void;
+};
+
+export type MessageComposerComposeProps = {
+  mode?: "compose";
+  onFeedbackChange?: (feedback: ComposerFeedback) => void;
+};
+
 const initialMessageComposerState: MessageComposerState = {
   success: false,
   error: null,
@@ -42,14 +59,23 @@ function formatFileSize(size: number): string {
   return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
-export function MessageComposer({
-  onFeedbackChange,
-}: {
+export type MessageComposerProps = (MessageComposerEditProps | MessageComposerComposeProps) & {
   onFeedbackChange?: (feedback: ComposerFeedback) => void;
-}) {
+};
+
+export function MessageComposer(props: MessageComposerProps) {
+  const {
+    mode = "compose",
+    onFeedbackChange,
+  } = props;
+
+  const isEditMode = mode === "edit";
+  const editProps = isEditMode ? (props as MessageComposerEditProps) : null;
+
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const isSubmittingRef = useRef(false);
   const [pending, startTransition] = useTransition();
   const [text, setText] = useState("");
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
@@ -60,6 +86,13 @@ export function MessageComposer({
   const [enterKeySends, setEnterKeySends] = useState(true);
 
   const hasContent = text.trim().length > 0 || selectedImage !== null;
+
+  useEffect(() => {
+    if (isEditMode && editProps) {
+      setText(editProps.initialText ?? "");
+      setClientError(null);
+    }
+  }, [isEditMode, editProps?.editingMessageId, editProps?.initialText]);
 
   useEffect(() => {
     const m = window.matchMedia("(pointer: coarse)");
@@ -94,14 +127,45 @@ export function MessageComposer({
   }, [text]);
 
   function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Escape") {
+      if (isEditMode && editProps) {
+        event.preventDefault();
+        editProps.onCancelEdit();
+      }
+      return;
+    }
     if (event.key !== "Enter") return;
     if (event.shiftKey) return; // Shift+Enter — новая строка на десктопе
     // На мобильных (pointer: coarse) Enter вставляет новую строку, отправка только по кнопке
     if (!enterKeySends) return;
     event.preventDefault();
+    if (isEditMode) {
+      if (!pending && editProps) handleSaveEdit();
+      return;
+    }
     if (!hasContent || pending) return;
     const form = event.currentTarget.form;
     if (form) form.requestSubmit();
+  }
+
+  function handleSaveEdit() {
+    if (!editProps) return;
+    const trimmed = text.trim();
+    const initialTrimmed = (editProps.initialText ?? "").trim();
+    if (trimmed.length === 0 && !editProps.editingMessageHasImage) {
+      setClientError("Сообщение не может быть пустым");
+      onFeedbackChange?.({ tone: "error", message: "Сообщение не может быть пустым" });
+      return;
+    }
+    if (trimmed === initialTrimmed) {
+      editProps.onCancelEdit();
+      return;
+    }
+    setClientError(null);
+    startTransition(async () => {
+      await editProps!.onSaveEdit(trimmed);
+      editProps!.onCancelEdit();
+    });
   }
 
   function handleSelectImage() {
@@ -128,6 +192,10 @@ export function MessageComposer({
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    if (pending || isSubmittingRef.current) {
+      event.currentTarget.value = "";
+      return;
+    }
     const file = event.currentTarget.files?.[0];
 
     if (!file) {
@@ -161,6 +229,10 @@ export function MessageComposer({
   }
 
   function handleSubmit(formData: FormData) {
+    if (isEditMode) return;
+    if (isSubmittingRef.current || pending) return;
+    isSubmittingRef.current = true;
+
     setClientError(null);
     setServerState(initialMessageComposerState);
 
@@ -174,35 +246,44 @@ export function MessageComposer({
     });
 
     startTransition(async () => {
-      const result = await createMessageFormAction(initialMessageComposerState, formData);
-      setServerState(result);
+      try {
+        const result = await createMessageFormAction(initialMessageComposerState, formData);
+        setServerState(result);
 
-      if (!result.success) {
+        if (!result.success) {
+          onFeedbackChange?.({
+            tone: "error",
+            message: result.error ?? "Не удалось отправить сообщение. Попробуйте позже",
+          });
+          return;
+        }
+
+        setText("");
+        setSelectedImage(null);
+        setClientError(null);
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+
         onFeedbackChange?.({
-          tone: "error",
-          message: result.error ?? "Не удалось отправить сообщение. Попробуйте позже",
+          tone: "success",
+          message: "Сообщение отправлено",
         });
-        return;
+        router.refresh();
+      } finally {
+        isSubmittingRef.current = false;
       }
-
-      setText("");
-      setSelectedImage(null);
-      setClientError(null);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-
-      onFeedbackChange?.({
-        tone: "success",
-        message: "Сообщение отправлено",
-      });
-      router.refresh();
     });
   }
 
   return (
-    <form action={handleSubmit} className="space-y-2">
+    <form
+      action={handleSubmit}
+      aria-busy={pending}
+      className="space-y-2"
+      style={pending ? { pointerEvents: "none" } : undefined}
+    >
       <input
         ref={fileInputRef}
         accept={ALLOWED_IMAGE_MIME_TYPES.join(",")}
@@ -213,7 +294,32 @@ export function MessageComposer({
       />
 
       <div className="rounded-2xl bg-[#1F2C3A]">
-        {selectedImage ? (
+        {isEditMode ? (
+          <div className="flex items-center justify-between gap-2 border-b border-[#22303D] px-2 py-1.5">
+            <span className="text-sm text-[#8FA1B3]">Редактирование сообщения</span>
+            <div className="flex items-center gap-1">
+              <button
+                aria-label="Отменить редактирование"
+                className="rounded-lg px-3 py-1.5 text-sm text-[#8FA1B3] transition hover:bg-white/10 hover:text-[#E6EEF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                onClick={() => editProps?.onCancelEdit()}
+                type="button"
+              >
+                Отмена
+              </button>
+              <button
+                aria-label="Сохранить изменения"
+                className="rounded-lg bg-[#2B5278] px-3 py-1.5 text-sm text-[#E6EEF7] transition hover:bg-[#336192] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                onClick={() => handleSaveEdit()}
+                type="button"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {!isEditMode && selectedImage ? (
           <div className="flex items-center gap-2 border-b border-[#22303D] px-2 py-1.5">
             <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#17212B]">
               {previewUrl ? (
@@ -260,32 +366,32 @@ export function MessageComposer({
         ) : null}
 
         <div className="flex items-center gap-2 px-2 py-2">
-          <button
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-            disabled={pending}
-            onClick={handleSelectImage}
-            type="button"
-          >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="20"
-              viewBox="0 0 24 24"
-              width="20"
-              xmlns="http://www.w3.org/2000/svg"
+          {!isEditMode ? (
+            <button
+              aria-label={selectedImage ? "Заменить изображение" : "Прикрепить изображение"}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              disabled={pending}
+              onClick={handleSelectImage}
+              type="button"
             >
-              <path
-                d="M12.5 6.5 7.8 11.2a3 3 0 0 0 4.2 4.2l6.4-6.4a4.5 4.5 0 0 0-6.4-6.4L5.6 9"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-            <span className="sr-only">
-              {selectedImage ? "Заменить изображение" : "Прикрепить изображение"}
-            </span>
-          </button>
+              <svg
+                aria-hidden="true"
+                fill="none"
+                height="20"
+                viewBox="0 0 24 24"
+                width="20"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12.5 6.5 7.8 11.2a3 3 0 0 0 4.2 4.2l6.4-6.4a4.5 4.5 0 0 0-6.4-6.4L5.6 9"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </button>
+          ) : null}
 
           <textarea
           ref={textareaRef}
@@ -304,34 +410,36 @@ export function MessageComposer({
           value={text}
         />
 
-        <button
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2B5278] text-[#E6EEF7] transition hover:bg-[#336192] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-          disabled={pending || !hasContent}
-          type="submit"
-        >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="20"
-            viewBox="0 0 24 24"
-            width="20"
-            xmlns="http://www.w3.org/2000/svg"
+        {!isEditMode ? (
+          <button
+            aria-label={pending ? "Отправка..." : "Отправить"}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2B5278] text-[#E6EEF7] transition hover:bg-[#336192] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            disabled={pending || !hasContent}
+            type="submit"
           >
-            <path
-              d="M3.5 10.5 20 3.5 13 20l-2.7-6.3L3.5 10.5Z"
-              stroke="currentColor"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-            <path
-              d="M10.3 13.7 20 3.5"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="1.8"
-            />
-          </svg>
-          <span className="sr-only">{pending ? "Отправка..." : "Отправить"}</span>
-        </button>
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="20"
+              viewBox="0 0 24 24"
+              width="20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M3.5 10.5 20 3.5 13 20l-2.7-6.3L3.5 10.5Z"
+                stroke="currentColor"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M10.3 13.7 20 3.5"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="1.8"
+              />
+            </svg>
+          </button>
+        ) : null}
         </div>
       </div>
 
