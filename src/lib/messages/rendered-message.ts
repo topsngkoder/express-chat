@@ -2,8 +2,10 @@ export type RenderedMessage = {
   id: string;
   senderId: string;
   senderName: string;
+  senderAvatarUrl: string | null;
   text: string | null;
   createdAt: string;
+  updatedAt: string | null;
   image: {
     url: string;
     alt: string;
