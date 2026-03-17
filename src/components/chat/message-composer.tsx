@@ -9,6 +9,7 @@ import {
   type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
+  type PointerEvent,
 } from "react";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
@@ -131,6 +132,12 @@ export function MessageComposer(props: MessageComposerProps) {
     adjustTextareaHeight();
   }, [text]);
 
+  function keepTextareaFocus(event: PointerEvent<HTMLButtonElement>) {
+    if (document.activeElement === textareaRef.current) {
+      event.preventDefault();
+    }
+  }
+
   function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Escape") {
       if (isEditMode && editProps) {
@@ -195,6 +202,10 @@ export function MessageComposer(props: MessageComposerProps) {
         message: "Изображение удалено из сообщения",
       });
     }
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -231,6 +242,10 @@ export function MessageComposer(props: MessageComposerProps) {
       tone: "info",
       message: "Изображение выбрано и готово к отправке",
     });
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
   }
 
   async function handleComposeSubmit() {
@@ -258,6 +273,10 @@ export function MessageComposer(props: MessageComposerProps) {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     } catch (error) {
       setClientError(error instanceof Error ? error.message : "Не удалось поставить сообщение в очередь");
     }
@@ -371,6 +390,7 @@ export function MessageComposer(props: MessageComposerProps) {
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
               disabled={isBusy}
               onClick={handleSelectImage}
+              onPointerDown={keepTextareaFocus}
               type="button"
             >
               <svg
@@ -413,6 +433,7 @@ export function MessageComposer(props: MessageComposerProps) {
             aria-label="Отправить"
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2B5278] text-[#E6EEF7] transition hover:bg-[#336192] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
             disabled={!hasContent}
+            onPointerDown={keepTextareaFocus}
             type="submit"
           >
             <svg
