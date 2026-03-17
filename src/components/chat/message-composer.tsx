@@ -18,6 +18,7 @@ const initialMessageComposerState: MessageComposerState = {
 type SelectedImage = {
   name: string;
   size: number;
+  file: File;
 };
 
 export type ComposerFeedback =
@@ -52,10 +53,31 @@ export function MessageComposer({
   const [pending, startTransition] = useTransition();
   const [text, setText] = useState("");
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [serverState, setServerState] = useState(initialMessageComposerState);
   const [clientError, setClientError] = useState<string | null>(null);
+  /** На тач-устройствах Enter вставляет новую строку, отправка только по кнопке. */
+  const [enterKeySends, setEnterKeySends] = useState(true);
 
   const hasContent = text.trim().length > 0 || selectedImage !== null;
+
+  useEffect(() => {
+    const m = window.matchMedia("(pointer: coarse)");
+    setEnterKeySends(!m.matches);
+    const handler = () => setEnterKeySends(!m.matches);
+    m.addEventListener("change", handler);
+    return () => m.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedImage) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedImage.file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedImage]);
   const errorMessage = clientError ?? serverState.error;
 
   function adjustTextareaHeight() {
@@ -73,7 +95,9 @@ export function MessageComposer({
 
   function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Enter") return;
-    if (event.shiftKey) return; // Shift+Enter — новая строка
+    if (event.shiftKey) return; // Shift+Enter — новая строка на десктопе
+    // На мобильных (pointer: coarse) Enter вставляет новую строку, отправка только по кнопке
+    if (!enterKeySends) return;
     event.preventDefault();
     if (!hasContent || pending) return;
     const form = event.currentTarget.form;
@@ -126,6 +150,7 @@ export function MessageComposer({
     setSelectedImage({
       name: file.name,
       size: file.size,
+      file,
     });
     setClientError(null);
     setServerState(initialMessageComposerState);
@@ -187,35 +212,82 @@ export function MessageComposer({
         type="file"
       />
 
-      <div className="flex items-center gap-2 rounded-2xl bg-[#1F2C3A] px-2 py-2">
-        <button
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-          disabled={pending}
-          onClick={handleSelectImage}
-          type="button"
-        >
-          <svg
-            aria-hidden="true"
-            fill="none"
-            height="20"
-            viewBox="0 0 24 24"
-            width="20"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M12.5 6.5 7.8 11.2a3 3 0 0 0 4.2 4.2l6.4-6.4a4.5 4.5 0 0 0-6.4-6.4L5.6 9"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-          </svg>
-          <span className="sr-only">
-            {selectedImage ? "Заменить изображение" : "Прикрепить изображение"}
-          </span>
-        </button>
+      <div className="rounded-2xl bg-[#1F2C3A]">
+        {selectedImage ? (
+          <div className="flex items-center gap-2 border-b border-[#22303D] px-2 py-1.5">
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[#17212B]">
+              {previewUrl ? (
+                <img
+                  alt=""
+                  className="h-full w-full object-cover"
+                  height={40}
+                  src={previewUrl}
+                  width={40}
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[#E6EEF7]">
+                {selectedImage.name}
+              </p>
+              <p className="text-xs text-[#8FA1B3]">{formatFileSize(selectedImage.size)}</p>
+            </div>
+            <button
+              aria-label="Удалить изображение из сообщения"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8FA1B3] transition hover:bg-white/10 hover:text-[#E6EEF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={pending}
+              onClick={handleRemoveImage}
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                fill="none"
+                height="16"
+                viewBox="0 0 24 24"
+                width="16"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M18 6 6 18M6 6l12 12"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
+            </button>
+          </div>
+        ) : null}
 
-        <textarea
+        <div className="flex items-center gap-2 px-2 py-2">
+          <button
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+            disabled={pending}
+            onClick={handleSelectImage}
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="20"
+              viewBox="0 0 24 24"
+              width="20"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M12.5 6.5 7.8 11.2a3 3 0 0 0 4.2 4.2l6.4-6.4a4.5 4.5 0 0 0-6.4-6.4L5.6 9"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+            </svg>
+            <span className="sr-only">
+              {selectedImage ? "Заменить изображение" : "Прикрепить изображение"}
+            </span>
+          </button>
+
+          <textarea
           ref={textareaRef}
           className="min-h-10 w-full flex-1 resize-none overflow-y-hidden bg-transparent px-2 py-2 text-sm leading-5 text-[#E6EEF7] outline-none placeholder:text-[#607382] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
@@ -260,27 +332,8 @@ export function MessageComposer({
           </svg>
           <span className="sr-only">{pending ? "Отправка..." : "Отправить"}</span>
         </button>
-      </div>
-
-      {selectedImage ? (
-        <div className="rounded-2xl border border-[#22303D] bg-[#17212B] px-4 py-3 text-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="truncate font-medium text-[#E6EEF7]">{selectedImage.name}</p>
-              <p className="text-[#8FA1B3]">{formatFileSize(selectedImage.size)}</p>
-            </div>
-
-            <button
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#22303D] px-4 py-2 text-sm font-medium text-[#E6EEF7] transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-              disabled={pending}
-              onClick={handleRemoveImage}
-              type="button"
-            >
-              Удалить изображение
-            </button>
-          </div>
         </div>
-      ) : null}
+      </div>
 
       {errorMessage ? (
         <p className="rounded-xl border border-[#5A1E24] bg-[#2A1214] px-4 py-3 text-sm text-[#F5B7B1]">
