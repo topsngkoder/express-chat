@@ -226,7 +226,12 @@ export function MessageList({
           const shouldShowSenderName = !meta.isOutgoing && meta.isGroupStart;
           const senderNameColor = shouldShowSenderName ? hashSenderIdToColor(message.senderId) : null;
           const isImageOnly = Boolean(message.image) && !message.text;
-          const bubblePaddingClass = isImageOnly ? "p-1" : "px-2.5 py-2";
+          const bubblePaddingClass = isImageOnly
+            ? "p-1"
+            : meta.isOutgoing
+              ? "px-2.5 pt-1.5 pb-1"
+              : "px-2.5 py-2";
+          const metaRowClass = meta.isOutgoing ? "mt-1 text-[11px] leading-3" : "mt-1 text-[11px] leading-4";
 
           return (
             <div key={message.id} className={`${spacingClass} flex ${alignmentClass}`}>
@@ -335,32 +340,10 @@ export function MessageList({
                       ) : null}
 
                       <div
-                        className={`mt-1 flex items-center gap-1 text-[11px] leading-4 ${
-                          meta.isOutgoing ? "justify-between text-[#B7C9DA]" : "justify-end text-[#8FA1B3]"
+                        className={`${metaRowClass} flex items-center gap-1 ${
+                          meta.isOutgoing ? "justify-end text-[#B7C9DA]" : "justify-end text-[#8FA1B3]"
                         }`}
                       >
-                        {canManageMessage ? (
-                          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#2B5278]"
-                              aria-label="Редактировать сообщение"
-                              onClick={() => onEditMessage?.(message.id, message.text ?? null, !!message.image)}
-                            >
-                              <IconPencil16 />
-                            </button>
-                            <button
-                              type="button"
-                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#2B5278]"
-                              aria-label="Удалить сообщение"
-                              onClick={() => onDeleteMessage?.(message.id)}
-                            >
-                              <IconCross16 />
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="min-w-0 flex-1" />
-                        )}
                         <div className="flex shrink-0 items-center gap-1">
                           <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
                           {meta.isOutgoing && message.updatedAt ? (
@@ -372,6 +355,27 @@ export function MessageList({
                         </div>
                       </div>
                     </article>
+
+                    {canManageMessage ? (
+                      <div className="pointer-events-none absolute bottom-full right-0 z-10 mb-1 flex items-center gap-0.5 rounded-lg border border-[#22303D] bg-[#182533] p-1 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                          aria-label="Редактировать сообщение"
+                          onClick={() => onEditMessage?.(message.id, message.text ?? null, !!message.image)}
+                        >
+                          <IconPencil16 />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                          aria-label="Удалить сообщение"
+                          onClick={() => onDeleteMessage?.(message.id)}
+                        >
+                          <IconCross16 />
+                        </button>
+                      </div>
+                    ) : null}
 
                     {canManageMessage && contextMenuMessageId === message.id ? (
                       <div
