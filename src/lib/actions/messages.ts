@@ -22,6 +22,7 @@ type HydrateRealtimeMessageInput = {
   text: string | null;
   imagePath: string | null;
   createdAt: string;
+  updatedAt?: string | null;
 };
 
 type MessageCursorInput = {
@@ -88,6 +89,8 @@ function isHydrateRealtimeMessageInput(value: unknown): value is HydrateRealtime
 
   const senderDisplayName = (candidate as HydrateRealtimeMessageInput).senderDisplayName;
 
+  const updatedAt = (candidate as HydrateRealtimeMessageInput).updatedAt;
+
   return (
     typeof candidate.id === "string" &&
     typeof candidate.senderId === "string" &&
@@ -95,6 +98,7 @@ function isHydrateRealtimeMessageInput(value: unknown): value is HydrateRealtime
     typeof candidate.createdAt === "string" &&
     (typeof candidate.text === "string" || candidate.text === null) &&
     (typeof candidate.imagePath === "string" || candidate.imagePath === null) &&
+    (updatedAt === undefined || updatedAt === null || typeof updatedAt === "string") &&
     (senderDisplayName === undefined ||
       senderDisplayName === null ||
       typeof senderDisplayName === "string")
@@ -136,6 +140,7 @@ export async function hydrateRealtimeMessageAction(
       text: input.text,
       imagePath: input.imagePath,
       createdAt: input.createdAt,
+      updatedAt: input.updatedAt ?? null,
     });
   } catch {
     return null;
@@ -162,6 +167,7 @@ export async function backfillMessagesAfterCursorAction(
         text: message.text,
         imagePath: message.imagePath,
         createdAt: message.createdAt,
+        updatedAt: message.updatedAt,
       })),
     );
   } catch {

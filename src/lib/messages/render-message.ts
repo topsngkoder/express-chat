@@ -13,6 +13,7 @@ type RenderMessageInput = {
   text: string | null;
   imagePath: string | null;
   createdAt: string;
+  updatedAt?: string | null;
 };
 
 type ProfileAvatarRow = {
@@ -95,7 +96,7 @@ export async function renderMessageForChat(message: RenderMessageInput): Promise
     senderAvatarUrl,
     text: message.text,
     createdAt: message.createdAt,
-    updatedAt: null,
+    updatedAt: message.updatedAt ?? null,
     image: imageUrl
       ? {
           url: imageUrl,

@@ -66,6 +66,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       text: item.text,
       imagePath: item.imagePath,
       createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
     })),
   );
 
