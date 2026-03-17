@@ -31,8 +31,8 @@ function parseHistoryPages(value: string | undefined): number {
 }
 
 export const metadata: Metadata = {
-  title: "Общий чат",
-  description: "Защищенная страница общего чата",
+  title: "Экспресс-чат",
+  description: "Защищенная страница чата",
 };
 
 export default async function ChatPage({ searchParams }: ChatPageProps) {
@@ -69,35 +69,13 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         <header className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold sm:text-3xl">Общий чат</h1>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Общий канал для подтвержденных пользователей. Новые сообщения и форма отправки
-                находятся ниже.
-              </p>
-            </div>
-
+            <h1 className="text-2xl font-semibold sm:text-3xl">Экспресс-чат</h1>
             <LogoutButton className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800" />
-          </div>
-
-          <div className="rounded-xl bg-zinc-100 px-4 py-3 text-sm text-zinc-700 dark:bg-zinc-800/70 dark:text-zinc-300">
-            Вы вошли как{" "}
-            <span className="break-all font-medium text-zinc-950 dark:text-zinc-50">
-              {user.email}
-            </span>
           </div>
         </header>
 
         <section className="min-h-[320px] rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
           <div className="flex h-full flex-col">
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold">Сообщения</h2>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                История чата отображается в хронологическом порядке. Сначала видны последние
-                сообщения, затем можно подгружать более ранние.
-              </p>
-            </div>
-
             <LiveMessageList
               currentUserId={user.id}
               hasMore={nextCursor !== null}
