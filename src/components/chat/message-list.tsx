@@ -157,10 +157,13 @@ export function MessageList({
   onDeleteMessage,
 }: MessageListProps) {
   const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null);
+  const [actionsExpandedMessageId, setActionsExpandedMessageId] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
   const longPressPointerIdRef = useRef<number | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const expandedActionsBlockRef = useRef<HTMLDivElement | null>(null);
 
   const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current !== null) {
@@ -173,15 +176,26 @@ export function MessageList({
   useEffect(() => () => clearLongPressTimer(), [clearLongPressTimer]);
 
   useEffect(() => {
-    if (!contextMenuMessageId) return;
+    const mq = window.matchMedia("(hover: hover)");
+    setIsDesktop(mq.matches);
+    const handler = () => setIsDesktop(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (contextMenuMessageId && contextMenuRef.current && !contextMenuRef.current.contains(target)) {
         setContextMenuMessageId(null);
+      }
+      if (actionsExpandedMessageId && expandedActionsBlockRef.current && !expandedActionsBlockRef.current.contains(target)) {
+        setActionsExpandedMessageId(null);
       }
     };
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
-  }, [contextMenuMessageId]);
+  }, [contextMenuMessageId, actionsExpandedMessageId]);
 
   if (messages.length === 0) {
     return (
@@ -267,7 +281,10 @@ export function MessageList({
                     </p>
                   ) : null}
 
-                  <div className="relative inline-block max-w-full self-end">
+                  <div
+                    className="relative inline-block max-w-full self-end"
+                    ref={actionsExpandedMessageId === message.id ? expandedActionsBlockRef : undefined}
+                  >
                     <article
                       data-group-start={meta.isGroupStart ? "true" : "false"}
                       data-group-end={meta.isGroupEnd ? "true" : "false"}
@@ -278,6 +295,11 @@ export function MessageList({
                       aria-label={
                         meta.isOutgoing
                           ? `Сообщение, ${formatMessageTime(message.createdAt)}`
+                          : undefined
+                      }
+                      onClick={
+                        canManageMessage && isDesktop
+                          ? () => setActionsExpandedMessageId((id) => (id === message.id ? null : message.id))
                           : undefined
                       }
                       onPointerDown={
@@ -291,6 +313,7 @@ export function MessageList({
                                 longPressTimerRef.current = null;
                                 longPressPointerIdRef.current = null;
                                 longPressFiredRef.current = true;
+                                setActionsExpandedMessageId(null);
                                 setContextMenuMessageId(message.id);
                               }, LONG_PRESS_MS);
                             }
@@ -341,7 +364,7 @@ export function MessageList({
 
                       <div
                         className={`${metaRowClass} flex items-center gap-1 ${
-                          meta.isOutgoing ? "justify-end text-[#B7C9DA]" : "justify-end text-[#8FA1B3]"
+                          meta.isOutgoing ? "justify-end text-[#6E8A9E]" : "justify-end text-[#7A8A99]"
                         }`}
                       >
                         <div className="flex shrink-0 items-center gap-1">
@@ -357,10 +380,16 @@ export function MessageList({
                     </article>
 
                     {canManageMessage ? (
-                      <div className="pointer-events-none absolute bottom-full right-0 z-10 mb-1 flex items-center gap-0.5 rounded-lg border border-[#22303D] bg-[#182533] p-1 opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                      <div
+                        className={
+                          isDesktop
+                            ? `absolute bottom-full right-0 z-[100] mb-1 flex items-center gap-0.5 rounded-lg border border-[#22303D] bg-[#182533] p-1 shadow-xl transition-opacity ${actionsExpandedMessageId === message.id ? "opacity-100" : "pointer-events-none opacity-0"}`
+                            : "pointer-events-none absolute bottom-full right-0 z-[100] mb-1 flex items-center gap-0.5 rounded-lg border border-[#22303D] bg-[#182533] p-1 opacity-0 shadow-xl transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                        }
+                      >
                         <button
                           type="button"
-                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none transition-colors hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
                           aria-label="Редактировать сообщение"
                           onClick={() => onEditMessage?.(message.id, message.text ?? null, !!message.image)}
                         >
@@ -368,7 +397,7 @@ export function MessageList({
                         </button>
                         <button
                           type="button"
-                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none transition-colors hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
                           aria-label="Удалить сообщение"
                           onClick={() => onDeleteMessage?.(message.id)}
                         >
