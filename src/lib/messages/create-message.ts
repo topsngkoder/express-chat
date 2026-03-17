@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { mapSupabaseError } from "@/lib/supabase/map-error";
 import { parseMessageDraft } from "@/lib/validation/message";
 
+import { getOrCreateCurrentProfile } from "@/lib/profile/profile-service";
 import { uploadChatImage } from "./upload-chat-image";
 
 const MESSAGE_RATE_LIMIT_WINDOW_MS = 60_000;
@@ -21,6 +22,7 @@ type MessageRow = {
   id: string;
   sender_id: string;
   sender_email: string;
+  sender_display_name: string | null;
   text: string | null;
   image_path: string | null;
   image_mime_type: string | null;
@@ -34,6 +36,7 @@ export type CreatedMessage = {
   id: string;
   senderId: string;
   senderEmail: string;
+  senderDisplayName: string | null;
   text: string | null;
   imagePath: string | null;
   imageMimeType: string | null;
@@ -53,6 +56,7 @@ function mapMessageRow(row: MessageRow): CreatedMessage {
     id: row.id,
     senderId: row.sender_id,
     senderEmail: row.sender_email,
+    senderDisplayName: row.sender_display_name,
     text: row.text,
     imagePath: row.image_path,
     imageMimeType: row.image_mime_type,
@@ -190,12 +194,19 @@ export async function createMessage(input: CreateMessageInput): Promise<CreatedM
       image: uploadedImage,
     });
 
+    const profile = await getOrCreateCurrentProfile();
+    const senderDisplayName =
+      (profile.displayName?.trim() && profile.displayName.trim().length > 0)
+        ? profile.displayName.trim()
+        : user.email;
+
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from("messages")
       .insert({
         sender_id: user.id,
         sender_email: user.email,
+        sender_display_name: senderDisplayName,
         text: draft.text,
         image_path: draft.image?.path ?? null,
         image_mime_type: draft.image?.mimeType ?? null,
@@ -204,7 +215,7 @@ export async function createMessage(input: CreateMessageInput): Promise<CreatedM
         image_height: draft.image?.height ?? null,
       })
       .select(
-        "id,sender_id,sender_email,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
+        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
       )
       .single();
 

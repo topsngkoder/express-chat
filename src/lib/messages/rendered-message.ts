@@ -1,7 +1,7 @@
 export type RenderedMessage = {
   id: string;
   senderId: string;
-  senderEmail: string;
+  senderName: string;
   text: string | null;
   createdAt: string;
   image: {

@@ -20,6 +20,7 @@ type RealtimeMessageRow = {
   id: string;
   sender_id: string;
   sender_email: string;
+  sender_display_name?: string | null;
   text: string | null;
   image_path: string | null;
   created_at: string;
@@ -81,7 +82,7 @@ function showBrowserNotification(message: RenderedMessage, currentUserId: string
   }
 
   try {
-    const notification = new window.Notification(`Новое сообщение от ${message.senderEmail}`, {
+    const notification = new window.Notification(`Новое сообщение от ${message.senderName}`, {
       body: getNotificationPreviewText(message),
       tag: `chat-message-${message.id}`,
     });
@@ -89,7 +90,7 @@ function showBrowserNotification(message: RenderedMessage, currentUserId: string
     logInfo("chat.notification_shown", {
       messageId: message.id,
       senderId: message.senderId,
-      senderEmail: message.senderEmail,
+      senderName: message.senderName,
       hasText: Boolean(message.text?.trim()),
       hasImage: Boolean(message.image),
     });
@@ -106,7 +107,7 @@ function showBrowserNotification(message: RenderedMessage, currentUserId: string
     logError("chat.notification_failed", error, {
       messageId: message.id,
       senderId: message.senderId,
-      senderEmail: message.senderEmail,
+      senderName: message.senderName,
       hasText: Boolean(message.text?.trim()),
       hasImage: Boolean(message.image),
     });
@@ -184,6 +185,7 @@ export function LiveMessageList({
               id: payload.new.id,
               senderId: payload.new.sender_id,
               senderEmail: payload.new.sender_email,
+              senderDisplayName: payload.new.sender_display_name ?? null,
               text: payload.new.text,
               imagePath: payload.new.image_path,
               createdAt: payload.new.created_at,

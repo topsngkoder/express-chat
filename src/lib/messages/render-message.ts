@@ -6,7 +6,7 @@ import type { RenderedMessage } from "@/lib/messages/rendered-message";
 type RenderMessageInput = {
   id: string;
   senderId: string;
-  senderEmail: string;
+  senderName: string;
   text: string | null;
   imagePath: string | null;
   createdAt: string;
@@ -18,13 +18,13 @@ export async function renderMessageForChat(message: RenderMessageInput): Promise
   return {
     id: message.id,
     senderId: message.senderId,
-    senderEmail: message.senderEmail,
+    senderName: message.senderName,
     text: message.text,
     createdAt: message.createdAt,
     image: imageUrl
       ? {
           url: imageUrl,
-          alt: message.text?.slice(0, 80) || `Изображение от ${message.senderEmail}`,
+          alt: message.text?.slice(0, 80) || `Изображение от ${message.senderName}`,
         }
       : null,
   };

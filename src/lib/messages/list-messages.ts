@@ -11,6 +11,7 @@ type MessageRow = {
   id: string;
   sender_id: string;
   sender_email: string;
+  sender_display_name: string | null;
   text: string | null;
   image_path: string | null;
   image_mime_type: string | null;
@@ -24,6 +25,7 @@ export type MessageListItem = {
   id: string;
   senderId: string;
   senderEmail: string;
+  senderName: string;
   text: string | null;
   imagePath: string | null;
   imageMimeType: string | null;
@@ -44,10 +46,16 @@ export type MessagesPage = {
 };
 
 function mapMessageRow(row: MessageRow): MessageListItem {
+  const senderName =
+    (row.sender_display_name?.trim() && row.sender_display_name.trim().length > 0)
+      ? row.sender_display_name.trim()
+      : row.sender_email;
+
   return {
     id: row.id,
     senderId: row.sender_id,
     senderEmail: row.sender_email,
+    senderName,
     text: row.text,
     imagePath: row.image_path,
     imageMimeType: row.image_mime_type,
@@ -75,7 +83,7 @@ export async function listMessagesPage(cursor?: MessageListCursor | null): Promi
     let query = supabase
       .from("messages")
       .select(
-        "id,sender_id,sender_email,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
+        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
       )
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
@@ -121,7 +129,7 @@ export async function listMessagesAfterCursor(
     const { data, error } = await supabase
       .from("messages")
       .select(
-        "id,sender_id,sender_email,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
+        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
       )
       .or(buildNewerThanFilter(cursor))
       .order("created_at", { ascending: true })

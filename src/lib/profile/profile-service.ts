@@ -4,14 +4,19 @@ import { cache } from "react";
 
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
 import { AppError } from "@/lib/errors";
+import { logError, logInfo } from "@/lib/logging/app-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mapSupabaseError } from "@/lib/supabase/map-error";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { validateAvatarFile } from "@/lib/validation/avatar";
 
 const AVATARS_BUCKET = "avatars";
 const AVATAR_SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 const PROFILE_SAVE_ERROR_MESSAGE = "Не удалось сохранить профиль. Попробуйте позже";
+const DISPLAY_NAME_LENGTH_ERROR_MESSAGE = "Ник должен быть от 2 до 50 символов";
+const DISPLAY_NAME_CHARSET_ERROR_MESSAGE =
+  "В нике допустимы только буквы, цифры, пробел, дефис и подчёркивание";
 const AVATAR_UPLOAD_ERROR_MESSAGE = "Не удалось загрузить аватар. Попробуйте позже";
 const AVATAR_REMOVE_ERROR_MESSAGE = "Не удалось удалить аватар. Попробуйте позже";
 const AVATAR_SIGNED_URL_ERROR_MESSAGE = "Не удалось загрузить аватар. Попробуйте позже";
@@ -43,6 +48,32 @@ function normalizeNullableText(input: string | null | undefined): string | null 
   if (input == null) return null;
   const trimmed = input.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+const DISPLAY_NAME_MIN_LENGTH = 2;
+const DISPLAY_NAME_MAX_LENGTH = 50;
+const DISPLAY_NAME_ALLOWED_PATTERN =
+  /^[A-Za-z0-9 _\-\u0400-\u04FF\u0500-\u052F\u2DE0-\u2DFF\uA640-\uA69F]+$/u;
+
+function normalizeAndValidateDisplayName(input: string | null | undefined): string | null {
+  const normalized = normalizeNullableText(input);
+  if (normalized == null) return null;
+
+  if (normalized.length < DISPLAY_NAME_MIN_LENGTH || normalized.length > DISPLAY_NAME_MAX_LENGTH) {
+    throw new AppError({
+      code: "VALIDATION",
+      publicMessage: DISPLAY_NAME_LENGTH_ERROR_MESSAGE,
+    });
+  }
+
+  if (!DISPLAY_NAME_ALLOWED_PATTERN.test(normalized)) {
+    throw new AppError({
+      code: "VALIDATION",
+      publicMessage: DISPLAY_NAME_CHARSET_ERROR_MESSAGE,
+    });
+  }
+
+  return normalized;
 }
 
 async function selectProfileById(userId: string): Promise<ProfileRow | null> {
@@ -96,7 +127,7 @@ export async function saveDisplayName(displayName: string | null): Promise<Profi
   const user = await requireConfirmedUser();
   await getOrCreateCurrentProfile();
 
-  const normalizedDisplayName = normalizeNullableText(displayName);
+  const normalizedDisplayName = normalizeAndValidateDisplayName(displayName);
 
   try {
     const supabase = await createSupabaseServerClient();
@@ -113,9 +144,16 @@ export async function saveDisplayName(displayName: string | null): Promise<Profi
       throw mapSupabaseError(error);
     }
 
+    logInfo("profile.display_name.saved", { userId: user.id });
     return mapProfileRow(data as ProfileRow);
   } catch (error) {
     if (error instanceof AppError) {
+      if (error.code === "VALIDATION") {
+        logError("profile.display_name.validation_failed", error, { userId: user.id });
+        throw error;
+      }
+
+      logError("profile.display_name.save_failed", error, { userId: user.id });
       throw new AppError({
         code: error.code,
         publicMessage: PROFILE_SAVE_ERROR_MESSAGE,
@@ -123,20 +161,13 @@ export async function saveDisplayName(displayName: string | null): Promise<Profi
       });
     }
 
+    logError("profile.display_name.save_failed", error, { userId: user.id });
     throw new AppError({
       code: "UPSTREAM",
       publicMessage: PROFILE_SAVE_ERROR_MESSAGE,
       cause: error,
     });
   }
-}
-
-function mapMimeTypeToAvatarExt(mimeType: string): "jpg" | "png" | "webp" | null {
-  const normalized = mimeType.trim().toLowerCase();
-  if (normalized === "image/jpeg") return "jpg";
-  if (normalized === "image/png") return "png";
-  if (normalized === "image/webp") return "webp";
-  return null;
 }
 
 function buildAvatarPath(userId: string, ext: "jpg" | "png" | "webp"): string {
@@ -148,15 +179,15 @@ export async function uploadAvatar(file: File): Promise<Profile> {
   await getOrCreateCurrentProfile();
 
   try {
-    const ext = mapMimeTypeToAvatarExt(file.type) ?? "jpg";
-    const path = buildAvatarPath(user.id, ext);
-
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    const validatedAvatar = validateAvatarFile(buffer, file.type);
+    const path = buildAvatarPath(user.id, validatedAvatar.suggestedExt);
+
     const admin = createSupabaseAdminClient();
     const { error: uploadError } = await admin.storage.from(AVATARS_BUCKET).upload(path, buffer, {
-      contentType: file.type || undefined,
+      contentType: validatedAvatar.mimeType,
       upsert: true,
     });
 
@@ -178,9 +209,16 @@ export async function uploadAvatar(file: File): Promise<Profile> {
       throw mapSupabaseError(error);
     }
 
+    logInfo("profile.avatar.uploaded", { userId: user.id });
     return mapProfileRow(data as ProfileRow);
   } catch (error) {
     if (error instanceof AppError) {
+      if (error.code === "VALIDATION") {
+        logError("profile.avatar.upload_validation_failed", error, { userId: user.id });
+        throw error;
+      }
+
+      logError("profile.avatar.upload_failed", error, { userId: user.id });
       throw new AppError({
         code: error.code,
         publicMessage: AVATAR_UPLOAD_ERROR_MESSAGE,
@@ -188,6 +226,7 @@ export async function uploadAvatar(file: File): Promise<Profile> {
       });
     }
 
+    logError("profile.avatar.upload_failed", error, { userId: user.id });
     throw new AppError({
       code: "UPSTREAM",
       publicMessage: AVATAR_UPLOAD_ERROR_MESSAGE,
@@ -226,9 +265,11 @@ export async function removeAvatar(): Promise<Profile> {
       // noop
     }
 
+    logInfo("profile.avatar.removed", { userId: user.id });
     return mapProfileRow(data as ProfileRow);
   } catch (error) {
     if (error instanceof AppError) {
+      logError("profile.avatar.remove_failed", error, { userId: user.id });
       throw new AppError({
         code: error.code,
         publicMessage: AVATAR_REMOVE_ERROR_MESSAGE,
@@ -236,6 +277,7 @@ export async function removeAvatar(): Promise<Profile> {
       });
     }
 
+    logError("profile.avatar.remove_failed", error, { userId: user.id });
     throw new AppError({
       code: "UPSTREAM",
       publicMessage: AVATAR_REMOVE_ERROR_MESSAGE,

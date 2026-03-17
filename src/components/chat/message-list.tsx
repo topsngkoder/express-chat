@@ -47,7 +47,7 @@ export function MessageList({ messages, loadedPages, hasMore }: MessageListProps
           >
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <p className="break-all text-sm font-medium text-zinc-950 dark:text-zinc-50">
-                {message.senderEmail}
+                {message.senderName}
               </p>
               <time
                 className="text-sm text-zinc-600 dark:text-zinc-400"

@@ -18,6 +18,7 @@ type HydrateRealtimeMessageInput = {
   id: string;
   senderId: string;
   senderEmail: string;
+  senderDisplayName?: string | null;
   text: string | null;
   imagePath: string | null;
   createdAt: string;
@@ -85,14 +86,25 @@ function isHydrateRealtimeMessageInput(value: unknown): value is HydrateRealtime
 
   const candidate = value as Record<string, unknown>;
 
+  const senderDisplayName = (candidate as HydrateRealtimeMessageInput).senderDisplayName;
+
   return (
     typeof candidate.id === "string" &&
     typeof candidate.senderId === "string" &&
     typeof candidate.senderEmail === "string" &&
     typeof candidate.createdAt === "string" &&
     (typeof candidate.text === "string" || candidate.text === null) &&
-    (typeof candidate.imagePath === "string" || candidate.imagePath === null)
+    (typeof candidate.imagePath === "string" || candidate.imagePath === null) &&
+    (senderDisplayName === undefined ||
+      senderDisplayName === null ||
+      typeof senderDisplayName === "string")
   );
+}
+
+function toSenderName(displayName: string | null | undefined, email: string): string {
+  const trimmed =
+    typeof displayName === "string" ? displayName.trim() : "";
+  return trimmed.length > 0 ? trimmed : email;
 }
 
 function isMessageCursorInput(value: unknown): value is MessageCursorInput {
@@ -115,7 +127,16 @@ export async function hydrateRealtimeMessageAction(
       return null;
     }
 
-    return await renderMessageForChat(input);
+    const senderName = toSenderName(input.senderDisplayName, input.senderEmail);
+
+    return await renderMessageForChat({
+      id: input.id,
+      senderId: input.senderId,
+      senderName,
+      text: input.text,
+      imagePath: input.imagePath,
+      createdAt: input.createdAt,
+    });
   } catch {
     return null;
   }
@@ -137,7 +158,7 @@ export async function backfillMessagesAfterCursorAction(
       messages.map((message) => ({
         id: message.id,
         senderId: message.senderId,
-        senderEmail: message.senderEmail,
+        senderName: message.senderName,
         text: message.text,
         imagePath: message.imagePath,
         createdAt: message.createdAt,

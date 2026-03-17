@@ -57,7 +57,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     loadedItems.map((item) => ({
       id: item.id,
       senderId: item.senderId,
-      senderEmail: item.senderEmail,
+      senderName: item.senderName,
       text: item.text,
       imagePath: item.imagePath,
       createdAt: item.createdAt,
