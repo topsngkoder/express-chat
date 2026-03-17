@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
 import { AppError } from "@/lib/errors";
 import { listMessagesAfterCursor, listMessagesPage, type MessageListCursor } from "@/lib/messages/list-messages";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createMessage } from "@/lib/messages/create-message";
 import { renderMessageForChat, renderMessagesForChat } from "@/lib/messages/render-message";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
@@ -225,5 +226,39 @@ export async function loadOlderMessagesPageAction(input: LoadOlderMessagesPageIn
     };
   } catch {
     return { messages: [], nextCursor: null };
+  }
+}
+
+const DELETE_MESSAGE_ERROR = "Не удалось удалить сообщение. Попробуйте позже";
+
+export type DeleteMessageResult = {
+  success: boolean;
+  error: string | null;
+};
+
+export async function deleteMessageAction(messageId: string): Promise<DeleteMessageResult> {
+  try {
+    const { user } = await requireConfirmedUser();
+
+    if (!messageId || typeof messageId !== "string" || messageId.trim() === "") {
+      return { success: false, error: DELETE_MESSAGE_ERROR };
+    }
+
+    const supabase = await createSupabaseServerClient();
+
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("id", messageId.trim())
+      .eq("sender_id", user.id);
+
+    if (error) {
+      return { success: false, error: DELETE_MESSAGE_ERROR };
+    }
+
+    revalidatePath("/chat");
+    return { success: true, error: null };
+  } catch {
+    return { success: false, error: DELETE_MESSAGE_ERROR };
   }
 }

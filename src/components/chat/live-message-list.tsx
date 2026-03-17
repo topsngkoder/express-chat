@@ -140,6 +140,7 @@ export function LiveMessageList({
   initialCursor,
   scrollContainerRef,
   onRealtimeInsert,
+  onDeleteMessage,
 }: {
   currentUserId: string;
   initialMessages: RenderedMessage[];
@@ -147,6 +148,7 @@ export function LiveMessageList({
   initialCursor: MessageListCursor | null;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
   onRealtimeInsert?: (message: RenderedMessage) => void;
+  onDeleteMessage?: (messageId: string) => void;
 }) {
   const [realtimeMessages, setRealtimeMessages] = useState<RenderedMessage[]>([]);
   const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
@@ -375,6 +377,7 @@ export function LiveMessageList({
         loadingOlder={loadingOlder}
         messages={messages}
         onLoadOlder={handleLoadOlder}
+        onDeleteMessage={onDeleteMessage}
       />
     </div>
   );

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { deleteMessageAction } from "@/lib/actions/messages";
 import type { MessageListCursor } from "@/lib/messages/list-messages";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
 
+import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { LiveMessageList } from "./live-message-list";
 import { MessageComposer } from "./message-composer";
 
@@ -48,12 +50,13 @@ export function ChatShell({
   const [isAtBottom, setIsAtBottom] = useState(true);
 
   const [editDraft] = useState<ChatEditDraft>(null);
-  const [modalState] = useState<ChatModalState>(null);
+  const [modalState, setModalState] = useState<ChatModalState>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   void unseenCount;
   void isAtBottom;
   void editDraft;
-  void modalState;
   void composerRef;
   void latestInsertRef;
   void initialLoadedPages;
@@ -161,6 +164,33 @@ export function ChatShell({
     [scrollToBottom],
   );
 
+  const handleRequestDelete = useCallback((messageId: string) => {
+    setDeleteError(null);
+    setModalState({ type: "delete-confirm", messageId });
+  }, []);
+
+  const handleCloseDeleteModal = useCallback(() => {
+    if (!deleteLoading) {
+      setModalState(null);
+      setDeleteError(null);
+    }
+  }, [deleteLoading]);
+
+  const handleConfirmDelete = useCallback(async (messageId: string) => {
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    const result = await deleteMessageAction(messageId);
+
+    setDeleteLoading(false);
+    if (result.success) {
+      setModalState(null);
+      setDeleteError(null);
+    } else {
+      setDeleteError(result.error ?? "Не удалось удалить сообщение. Попробуйте позже");
+    }
+  }, []);
+
   return (
     <main className="dark h-dvh overflow-hidden bg-[#0E1621] text-[#E6EEF7]">
       <div className="mx-auto flex h-full w-full max-w-[960px] flex-col">
@@ -210,6 +240,7 @@ export function ChatShell({
             initialMessages={initialMessages}
             scrollContainerRef={scrollRef}
             onRealtimeInsert={handleRealtimeInsert}
+            onDeleteMessage={handleRequestDelete}
           />
 
           {unseenCount > 0 && !isAtBottom ? (
@@ -239,6 +270,15 @@ export function ChatShell({
           </div>
         </footer>
       </div>
+
+      <ConfirmDeleteDialog
+        open={modalState?.type === "delete-confirm"}
+        messageId={modalState?.type === "delete-confirm" ? modalState.messageId : null}
+        loading={deleteLoading}
+        error={deleteError}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleConfirmDelete}
+      />
     </main>
   );
 }
