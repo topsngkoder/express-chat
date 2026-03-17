@@ -8,7 +8,7 @@ import { logError, logInfo } from "@/lib/logging/app-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mapSupabaseError } from "@/lib/supabase/map-error";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { validateAvatarFile } from "@/lib/validation/avatar";
+import { processAvatarToMax1MB } from "@/lib/profile/process-avatar";
 
 const AVATARS_BUCKET = "avatars";
 const AVATAR_SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -180,14 +180,14 @@ export async function uploadAvatar(file: File): Promise<Profile> {
 
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const inputBuffer = Buffer.from(arrayBuffer);
 
-    const validatedAvatar = validateAvatarFile(buffer, file.type);
-    const path = buildAvatarPath(user.id, validatedAvatar.suggestedExt);
+    const processed = await processAvatarToMax1MB(inputBuffer, file.type);
+    const path = buildAvatarPath(user.id, processed.suggestedExt);
 
     const admin = createSupabaseAdminClient();
-    const { error: uploadError } = await admin.storage.from(AVATARS_BUCKET).upload(path, buffer, {
-      contentType: validatedAvatar.mimeType,
+    const { error: uploadError } = await admin.storage.from(AVATARS_BUCKET).upload(path, processed.buffer, {
+      contentType: processed.mimeType,
       upsert: true,
     });
 
