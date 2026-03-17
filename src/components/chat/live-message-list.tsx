@@ -370,6 +370,7 @@ export function LiveMessageList({
       ) : null}
 
       <MessageList
+        currentUserId={currentUserId}
         hasMore={hasMore}
         loadingOlder={loadingOlder}
         messages={messages}
