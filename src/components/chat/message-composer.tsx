@@ -148,7 +148,7 @@ export function MessageComposer({
   }
 
   return (
-    <form action={handleSubmit} className="mt-4 space-y-4">
+    <form action={handleSubmit} className="space-y-2">
       <input
         ref={fileInputRef}
         accept={ALLOWED_IMAGE_MIME_TYPES.join(",")}
@@ -158,42 +158,89 @@ export function MessageComposer({
         type="file"
       />
 
-      <div className="space-y-1.5">
-        <label className="block text-sm font-medium" htmlFor="message-text">
-          Сообщение
-        </label>
+      <div className="flex items-center gap-2 rounded-2xl bg-[#1F2C3A] px-2 py-2">
+        <button
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          disabled={pending}
+          onClick={handleSelectImage}
+          type="button"
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="20"
+            viewBox="0 0 24 24"
+            width="20"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M12.5 6.5 7.8 11.2a3 3 0 0 0 4.2 4.2l6.4-6.4a4.5 4.5 0 0 0-6.4-6.4L5.6 9"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+          </svg>
+          <span className="sr-only">
+            {selectedImage ? "Заменить изображение" : "Прикрепить изображение"}
+          </span>
+        </button>
+
         <textarea
-          className="min-h-28 w-full resize-y rounded-2xl border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm outline-none transition focus:border-zinc-950 dark:border-zinc-700 dark:bg-zinc-950/40 dark:focus:border-zinc-100"
+          className="h-10 min-h-10 max-h-[160px] w-full flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-5 text-[#E6EEF7] outline-none placeholder:text-[#607382] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={pending}
           id="message-text"
           maxLength={1000}
           name="text"
+          rows={1}
           onChange={(event) => {
             setText(event.currentTarget.value);
             setServerState(initialMessageComposerState);
           }}
-          placeholder="Напишите сообщение"
+          placeholder="Сообщение..."
           value={text}
         />
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          До 1000 символов. Можно отправить текст, одно изображение или оба варианта сразу.
-        </p>
+
+        <button
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2B5278] text-[#E6EEF7] transition hover:bg-[#336192] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          disabled={pending || !hasContent}
+          type="submit"
+        >
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="20"
+            viewBox="0 0 24 24"
+            width="20"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M3.5 10.5 20 3.5 13 20l-2.7-6.3L3.5 10.5Z"
+              stroke="currentColor"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M10.3 13.7 20 3.5"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="1.8"
+            />
+          </svg>
+          <span className="sr-only">{pending ? "Отправка..." : "Отправить"}</span>
+        </button>
       </div>
 
       {selectedImage ? (
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm dark:border-zinc-800 dark:bg-zinc-950/40">
+        <div className="rounded-2xl border border-[#22303D] bg-[#17212B] px-4 py-3 text-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="truncate font-medium text-zinc-950 dark:text-zinc-50">
-                {selectedImage.name}
-              </p>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                {formatFileSize(selectedImage.size)}
-              </p>
+              <p className="truncate font-medium text-[#E6EEF7]">{selectedImage.name}</p>
+              <p className="text-[#8FA1B3]">{formatFileSize(selectedImage.size)}</p>
             </div>
 
             <button
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#22303D] px-4 py-2 text-sm font-medium text-[#E6EEF7] transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
               disabled={pending}
               onClick={handleRemoveImage}
               type="button"
@@ -205,33 +252,10 @@ export function MessageComposer({
       ) : null}
 
       {errorMessage ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+        <p className="rounded-xl border border-[#5A1E24] bg-[#2A1214] px-4 py-3 text-sm text-[#F5B7B1]">
           {errorMessage}
         </p>
       ) : null}
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <button
-          className="min-h-11 rounded-xl border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-800"
-          disabled={pending}
-          onClick={handleSelectImage}
-          type="button"
-        >
-          {selectedImage ? "Заменить изображение" : "Выбрать изображение"}
-        </button>
-        <button
-          className="min-h-11 rounded-xl bg-zinc-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-300"
-          disabled={pending || !hasContent}
-          type="submit"
-        >
-          {pending ? "Отправка..." : "Отправить"}
-        </button>
-      </div>
-
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Поддерживаются JPEG, PNG и WebP до{" "}
-        {Math.round(MAX_IMAGE_SIZE_BYTES / (1024 * 1024))} МБ.
-      </p>
     </form>
   );
 }
