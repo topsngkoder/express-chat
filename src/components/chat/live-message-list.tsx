@@ -136,6 +136,7 @@ function showBrowserNotification(message: RenderedMessage, currentUserId: string
 export function LiveMessageList({
   currentUserId,
   initialMessages,
+  optimisticMessages = [],
   initialHasMore,
   initialCursor,
   scrollContainerRef,
@@ -145,6 +146,7 @@ export function LiveMessageList({
 }: {
   currentUserId: string;
   initialMessages: RenderedMessage[];
+  optimisticMessages?: RenderedMessage[];
   initialHasMore: boolean;
   initialCursor: MessageListCursor | null;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
@@ -170,19 +172,20 @@ export function LiveMessageList({
       return;
     }
 
-    const node = scrollContainerRef?.current ?? null;
-    if (!node) {
+    const scrollElement = scrollContainerRef?.current ?? null;
+    if (!(scrollElement instanceof HTMLElement)) {
       pendingScrollRestoreRef.current = null;
       return;
     }
 
-    const delta = node.scrollHeight - pending.prevScrollHeight;
-    node.scrollTop = pending.prevScrollTop + delta;
+    const delta = scrollElement.scrollHeight - pending.prevScrollHeight;
+    scrollElement.scrollTo({ top: pending.prevScrollTop + delta });
     pendingScrollRestoreRef.current = null;
   }, [historyMessages, scrollContainerRef]);
 
   const messages = useMemo(() => {
-    const merged = mergeRenderedMessages(historyMessages, realtimeMessages);
+    const mergedHistory = mergeRenderedMessages(optimisticMessages, historyMessages);
+    const merged = mergeRenderedMessages(mergedHistory, realtimeMessages);
 
     if (deletedMessageIds.length === 0) {
       return merged;
@@ -190,13 +193,17 @@ export function LiveMessageList({
 
     const deletedIdSet = new Set(deletedMessageIds);
     return merged.filter((message) => !deletedIdSet.has(message.id));
-  }, [historyMessages, realtimeMessages, deletedMessageIds]);
+  }, [deletedMessageIds, historyMessages, optimisticMessages, realtimeMessages]);
   const latestMessage = useMemo(() => {
-    if (messages.length === 0) {
+    const persistedMessages = messages.filter(
+      (message) => !message.isOptimistic || message.deliveryStatus === "sent",
+    );
+
+    if (persistedMessages.length === 0) {
       return null;
     }
 
-    return [...messages].sort(compareRenderedMessages).at(-1) ?? null;
+    return [...persistedMessages].sort(compareRenderedMessages).at(-1) ?? null;
   }, [messages]);
   const latestMessageRef = useRef<RenderedMessage | null>(latestMessage);
 

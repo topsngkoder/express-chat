@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { deleteMessageAction, editMessageAction } from "@/lib/actions/messages";
+import { createMessageFormAction, deleteMessageAction, editMessageAction } from "@/lib/actions/messages";
 import type { MessageListCursor } from "@/lib/messages/list-messages";
-import type { RenderedMessage } from "@/lib/messages/rendered-message";
+import { mergeRenderedMessages, type RenderedMessage } from "@/lib/messages/rendered-message";
 
 import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { LiveMessageList } from "./live-message-list";
-import { MessageComposer } from "./message-composer";
+import { MessageComposer, type MessageComposerSubmitInput } from "./message-composer";
 
 type ChatModalState =
   | {
@@ -26,8 +26,22 @@ type ChatEditDraft =
     }
   | null;
 
+const initialMessageComposerState = {
+  success: false,
+  error: null,
+} as const;
+
+function buildClientMessageId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function ChatShell({
   currentUserId,
+  currentUserAvatarUrl,
   userDisplayName,
   initialMessages,
   initialCursor,
@@ -35,6 +49,7 @@ export function ChatShell({
   initialLoadedPages,
 }: {
   currentUserId: string;
+  currentUserAvatarUrl: string | null;
   userDisplayName: string;
   initialMessages: RenderedMessage[];
   initialCursor: MessageListCursor | null;
@@ -54,6 +69,10 @@ export function ChatShell({
   const [modalState, setModalState] = useState<ChatModalState>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [optimisticMessages, setOptimisticMessages] = useState<RenderedMessage[]>([]);
+
+  const sendQueueRef = useRef(Promise.resolve());
+  const objectUrlByClientIdRef = useRef(new Map<string, string>());
 
   void unseenCount;
   void isAtBottom;
@@ -94,6 +113,18 @@ export function ChatShell({
       window.removeEventListener("resize", applyPadding);
       resizeObserver.disconnect();
       scrollNode.style.paddingBottom = "";
+    };
+  }, []);
+
+  useEffect(() => {
+    const objectUrlByClientId = objectUrlByClientIdRef.current;
+
+    return () => {
+      for (const objectUrl of objectUrlByClientId.values()) {
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      objectUrlByClientId.clear();
     };
   }, []);
 
@@ -152,6 +183,10 @@ export function ChatShell({
 
   const handleRealtimeInsert = useCallback(
     (message: RenderedMessage) => {
+      if (message.senderId === currentUserId) {
+        return;
+      }
+
       latestInsertRef.current = message.id;
 
       if (isAtBottomRef.current) {
@@ -161,7 +196,7 @@ export function ChatShell({
 
       setUnseenCount((current) => current + 1);
     },
-    [scrollToBottom],
+    [currentUserId, scrollToBottom],
   );
 
   const handleRequestDelete = useCallback((messageId: string) => {
@@ -210,6 +245,113 @@ export function ChatShell({
     setEditDraft(null);
   }, []);
 
+  const handleSubmitMessage = useCallback(
+    ({ text, imageFile }: MessageComposerSubmitInput) => {
+      const clientId = buildClientMessageId();
+      const localId = `local:${clientId}`;
+      const createdAt = new Date().toISOString();
+      const objectUrl = imageFile ? URL.createObjectURL(imageFile) : null;
+
+      if (objectUrl) {
+        objectUrlByClientIdRef.current.set(clientId, objectUrl);
+      }
+
+      const optimisticMessage: RenderedMessage = {
+        id: localId,
+        clientId,
+        senderId: currentUserId,
+        senderName: userDisplayName,
+        senderAvatarUrl: currentUserAvatarUrl,
+        text,
+        createdAt,
+        updatedAt: null,
+        deliveryStatus: "pending",
+        errorMessage: null,
+        isOptimistic: true,
+        image: objectUrl
+          ? {
+              url: objectUrl,
+              alt: text?.slice(0, 80) || `Изображение от ${userDisplayName}`,
+            }
+          : null,
+      };
+
+      setOptimisticMessages((current) => mergeRenderedMessages(current, [optimisticMessage]));
+
+      if (isAtBottomRef.current) {
+        requestAnimationFrame(scrollToBottom);
+      }
+
+      sendQueueRef.current = sendQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const formData = new FormData();
+            formData.set("text", text ?? "");
+
+            if (imageFile) {
+              formData.set("image", imageFile);
+            }
+
+            const result = await createMessageFormAction(initialMessageComposerState, formData);
+
+            if (result.success && result.message) {
+              const previewUrl = objectUrlByClientIdRef.current.get(clientId);
+
+              if (previewUrl) {
+                URL.revokeObjectURL(previewUrl);
+                objectUrlByClientIdRef.current.delete(clientId);
+              }
+
+              setOptimisticMessages((current) =>
+                current.map((message) =>
+                  message.clientId === clientId
+                    ? {
+                        ...result.message,
+                        clientId,
+                        deliveryStatus: "sent",
+                        errorMessage: null,
+                        isOptimistic: true,
+                      }
+                    : message,
+                ),
+              );
+
+              return;
+            }
+
+            setOptimisticMessages((current) =>
+              current.map((message) =>
+                message.clientId === clientId
+                  ? {
+                      ...message,
+                      deliveryStatus: "failed",
+                      errorMessage: result.error ?? "Не удалось отправить сообщение. Попробуйте позже",
+                    }
+                  : message,
+              ),
+            );
+          } catch (error) {
+            setOptimisticMessages((current) =>
+              current.map((message) =>
+                message.clientId === clientId
+                  ? {
+                      ...message,
+                      deliveryStatus: "failed",
+                      errorMessage:
+                        error instanceof Error
+                          ? error.message
+                          : "Не удалось отправить сообщение. Попробуйте позже",
+                    }
+                  : message,
+              ),
+            );
+          }
+        });
+    },
+    [currentUserAvatarUrl, currentUserId, scrollToBottom, userDisplayName],
+  );
+
   return (
     <main className="dark h-dvh overflow-hidden bg-[#0E1621] text-[#E6EEF7]">
       <div className="mx-auto flex h-full w-full max-w-[960px] flex-col">
@@ -257,6 +399,7 @@ export function ChatShell({
             initialCursor={initialCursor}
             initialHasMore={initialHasMore}
             initialMessages={initialMessages}
+            optimisticMessages={optimisticMessages}
             scrollContainerRef={scrollRef}
             onRealtimeInsert={handleRealtimeInsert}
             onEditMessage={handleRequestEdit}
@@ -297,7 +440,7 @@ export function ChatShell({
                 onCancelEdit={handleCancelEdit}
               />
             ) : (
-              <MessageComposer key="compose" />
+              <MessageComposer key="compose" onSubmitMessage={handleSubmitMessage} />
             )}
           </div>
         </footer>

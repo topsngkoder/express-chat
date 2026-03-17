@@ -15,6 +15,10 @@ export type MessageComposerState = {
   error: string | null;
 };
 
+export type CreateMessageFormActionResult = MessageComposerState & {
+  message: RenderedMessage | null;
+};
+
 type HydrateRealtimeMessageInput = {
   id: string;
   senderId: string;
@@ -48,14 +52,24 @@ function getOptionalImageFile(formData: FormData): File | null {
 export async function createMessageFormAction(
   _previousState: MessageComposerState,
   formData: FormData,
-): Promise<MessageComposerState> {
+): Promise<CreateMessageFormActionResult> {
   const text = (formData.get("text") ?? "") as string;
   const imageFile = getOptionalImageFile(formData);
 
   try {
-    await createMessage({
+    const createdMessage = await createMessage({
       text,
       imageFile,
+    });
+    const senderName = toSenderName(createdMessage.senderDisplayName, createdMessage.senderEmail);
+    const renderedMessage = await renderMessageForChat({
+      id: createdMessage.id,
+      senderId: createdMessage.senderId,
+      senderName,
+      text: createdMessage.text,
+      imagePath: createdMessage.imagePath,
+      createdAt: createdMessage.createdAt,
+      updatedAt: null,
     });
 
     revalidatePath("/chat");
@@ -63,6 +77,7 @@ export async function createMessageFormAction(
     return {
       success: true,
       error: null,
+      message: renderedMessage,
     };
   } catch (error) {
     const appError =
@@ -77,6 +92,7 @@ export async function createMessageFormAction(
     return {
       success: false,
       error: appError.publicMessage,
+      message: null,
     };
   }
 }

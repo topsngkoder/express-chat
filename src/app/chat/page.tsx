@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { ChatShell } from "@/components/chat/chat-shell";
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
-import { getOrCreateCurrentProfile } from "@/lib/profile/profile-service";
+import { getAvatarSignedUrl, getOrCreateCurrentProfile } from "@/lib/profile/profile-service";
 import { renderMessagesForChat } from "@/lib/messages/render-message";
 import { listMessagesPage, type MessageListItem } from "@/lib/messages/list-messages";
 
@@ -44,6 +44,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       ? profile.displayName.trim()
       : null;
   const userDisplayName = displayName ?? user.email;
+  const currentUserAvatarUrl = await getAvatarSignedUrl(profile.avatarPath);
   let nextCursor: Awaited<ReturnType<typeof listMessagesPage>>["nextCursor"] = null;
   const loadedItems: MessageListItem[] = [];
 
@@ -73,6 +74,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   return (
     <ChatShell
       currentUserId={user.id}
+      currentUserAvatarUrl={currentUserAvatarUrl}
       initialCursor={nextCursor}
       initialHasMore={nextCursor !== null}
       initialLoadedPages={historyPages}

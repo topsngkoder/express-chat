@@ -1,13 +1,18 @@
 "use client";
 
-import { useRef, useState, useTransition, useEffect, type ChangeEvent, type KeyboardEvent } from "react";
-import { useRouter } from "next/navigation";
-
-import { createMessageFormAction, type MessageComposerState } from "@/lib/actions/messages";
+import {
+  useRef,
+  useState,
+  useTransition,
+  useEffect,
+  useMemo,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   clientImagePrecheck,
-  MAX_IMAGE_SIZE_BYTES,
 } from "@/lib/validation/image";
 
 export type ComposerMode = "compose" | "edit";
@@ -25,11 +30,12 @@ export type MessageComposerEditProps = {
 export type MessageComposerComposeProps = {
   mode?: "compose";
   onFeedbackChange?: (feedback: ComposerFeedback) => void;
+  onSubmitMessage?: (input: MessageComposerSubmitInput) => void | Promise<void>;
 };
 
-const initialMessageComposerState: MessageComposerState = {
-  success: false,
-  error: null,
+export type MessageComposerSubmitInput = {
+  text: string | null;
+  imageFile: File | null;
 };
 
 type SelectedImage = {
@@ -71,47 +77,46 @@ export function MessageComposer(props: MessageComposerProps) {
 
   const isEditMode = mode === "edit";
   const editProps = isEditMode ? (props as MessageComposerEditProps) : null;
-
-  const router = useRouter();
+  const composeProps = !isEditMode ? (props as MessageComposerComposeProps) : null;
+  const initialText = isEditMode ? (editProps?.initialText ?? "") : "";
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const isSubmittingRef = useRef(false);
   const [pending, startTransition] = useTransition();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [serverState, setServerState] = useState(initialMessageComposerState);
   const [clientError, setClientError] = useState<string | null>(null);
   /** На тач-устройствах Enter вставляет новую строку, отправка только по кнопке. */
-  const [enterKeySends, setEnterKeySends] = useState(true);
+  const [enterKeySends, setEnterKeySends] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    return !window.matchMedia("(pointer: coarse)").matches;
+  });
 
   const hasContent = text.trim().length > 0 || selectedImage !== null;
-
-  useEffect(() => {
-    if (isEditMode && editProps) {
-      setText(editProps.initialText ?? "");
-      setClientError(null);
-    }
-  }, [isEditMode, editProps?.editingMessageId, editProps?.initialText]);
+  const previewUrl = useMemo(
+    () => (selectedImage ? URL.createObjectURL(selectedImage.file) : null),
+    [selectedImage],
+  );
 
   useEffect(() => {
     const m = window.matchMedia("(pointer: coarse)");
-    setEnterKeySends(!m.matches);
     const handler = () => setEnterKeySends(!m.matches);
     m.addEventListener("change", handler);
     return () => m.removeEventListener("change", handler);
   }, []);
 
   useEffect(() => {
-    if (!selectedImage) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(selectedImage.file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selectedImage]);
-  const errorMessage = clientError ?? serverState.error;
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const errorMessage = clientError;
+  const isBusy = isEditMode ? pending : false;
 
   function adjustTextareaHeight() {
     const ta = textareaRef.current;
@@ -140,12 +145,11 @@ export function MessageComposer(props: MessageComposerProps) {
     if (!enterKeySends) return;
     event.preventDefault();
     if (isEditMode) {
-      if (!pending && editProps) handleSaveEdit();
+      if (!isBusy && editProps) handleSaveEdit();
       return;
     }
-    if (!hasContent || pending) return;
-    const form = event.currentTarget.form;
-    if (form) form.requestSubmit();
+    if (!hasContent || isBusy) return;
+    void handleComposeSubmit();
   }
 
   function handleSaveEdit() {
@@ -185,8 +189,6 @@ export function MessageComposer(props: MessageComposerProps) {
 
     setSelectedImage(null);
     setClientError(null);
-    setServerState(initialMessageComposerState);
-
     if (removedImage) {
       onFeedbackChange?.({
         tone: "info",
@@ -196,7 +198,7 @@ export function MessageComposer(props: MessageComposerProps) {
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
-    if (pending || isSubmittingRef.current) {
+    if (isBusy) {
       event.currentTarget.value = "";
       return;
     }
@@ -225,68 +227,61 @@ export function MessageComposer(props: MessageComposerProps) {
       file,
     });
     setClientError(null);
-    setServerState(initialMessageComposerState);
     onFeedbackChange?.({
       tone: "info",
       message: "Изображение выбрано и готово к отправке",
     });
   }
 
-  function handleSubmit(formData: FormData) {
-    if (isEditMode) return;
-    if (isSubmittingRef.current || pending) return;
-    isSubmittingRef.current = true;
+  async function handleComposeSubmit() {
+    if (isEditMode || !composeProps?.onSubmitMessage) return;
+    if (!hasContent) return;
 
+    const trimmedText = text.trim();
     setClientError(null);
-    setServerState(initialMessageComposerState);
-
-    if (!selectedImage) {
-      formData.delete("image");
-    }
 
     onFeedbackChange?.({
       tone: "info",
-      message: "Отправляем сообщение...",
+      message: "Сообщение поставлено в очередь",
     });
 
-    startTransition(async () => {
-      try {
-        const result = await createMessageFormAction(initialMessageComposerState, formData);
-        setServerState(result);
+    try {
+      await composeProps.onSubmitMessage({
+        text: trimmedText.length > 0 ? trimmedText : null,
+        imageFile: selectedImage?.file ?? null,
+      });
 
-        if (!result.success) {
-          onFeedbackChange?.({
-            tone: "error",
-            message: result.error ?? "Не удалось отправить сообщение. Попробуйте позже",
-          });
-          return;
-        }
+      setText("");
+      setSelectedImage(null);
+      setClientError(null);
 
-        setText("");
-        setSelectedImage(null);
-        setClientError(null);
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-
-        onFeedbackChange?.({
-          tone: "success",
-          message: "Сообщение отправлено",
-        });
-        router.refresh();
-      } finally {
-        isSubmittingRef.current = false;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
-    });
+    } catch (error) {
+      setClientError(error instanceof Error ? error.message : "Не удалось поставить сообщение в очередь");
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isEditMode) {
+      if (!isBusy) {
+        handleSaveEdit();
+      }
+
+      return;
+    }
+
+    void handleComposeSubmit();
   }
 
   return (
     <form
-      action={handleSubmit}
-      aria-busy={pending}
+      aria-busy={isBusy}
       className="space-y-2"
-      style={pending ? { pointerEvents: "none" } : undefined}
+      onSubmit={handleSubmit}
     >
       <input
         ref={fileInputRef}
@@ -305,7 +300,7 @@ export function MessageComposer(props: MessageComposerProps) {
               <button
                 aria-label="Отменить редактирование"
                 className="rounded-lg px-3 py-1.5 text-sm text-[#8FA1B3] transition hover:bg-white/10 hover:text-[#E6EEF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={pending}
+                disabled={isBusy}
                 onClick={() => editProps?.onCancelEdit()}
                 type="button"
               >
@@ -314,7 +309,7 @@ export function MessageComposer(props: MessageComposerProps) {
               <button
                 aria-label="Сохранить изменения"
                 className="rounded-lg bg-[#2B5278] px-3 py-1.5 text-sm text-[#E6EEF7] transition hover:bg-[#336192] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={pending}
+                disabled={isBusy}
                 onClick={() => handleSaveEdit()}
                 type="button"
               >
@@ -345,7 +340,7 @@ export function MessageComposer(props: MessageComposerProps) {
             <button
               aria-label="Удалить изображение из сообщения"
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8FA1B3] transition hover:bg-white/10 hover:text-[#E6EEF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={pending}
+              disabled={isBusy}
               onClick={handleRemoveImage}
               type="button"
             >
@@ -374,7 +369,7 @@ export function MessageComposer(props: MessageComposerProps) {
             <button
               aria-label={selectedImage ? "Заменить изображение" : "Прикрепить изображение"}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#8FA1B3] transition hover:bg-white/5 hover:text-[#E6EEF7] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-              disabled={pending}
+              disabled={isBusy}
               onClick={handleSelectImage}
               type="button"
             >
@@ -400,14 +395,13 @@ export function MessageComposer(props: MessageComposerProps) {
           <textarea
           ref={textareaRef}
           className="min-h-10 w-full flex-1 resize-none overflow-y-hidden bg-transparent px-2 py-2 text-sm leading-5 text-[#E6EEF7] outline-none placeholder:text-[#607382] disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={pending}
+          disabled={isBusy}
           id="message-text"
           maxLength={1000}
           name="text"
           rows={1}
           onChange={(event) => {
             setText(event.currentTarget.value);
-            setServerState(initialMessageComposerState);
           }}
           onKeyDown={handleTextareaKeyDown}
           placeholder="Сообщение..."
@@ -416,9 +410,9 @@ export function MessageComposer(props: MessageComposerProps) {
 
         {!isEditMode ? (
           <button
-            aria-label={pending ? "Отправка..." : "Отправить"}
+            aria-label="Отправить"
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2B5278] text-[#E6EEF7] transition hover:bg-[#336192] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-            disabled={pending || !hasContent}
+            disabled={!hasContent}
             type="submit"
           >
             <svg

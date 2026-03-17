@@ -1,3 +1,5 @@
+export type MessageDeliveryStatus = "pending" | "sent" | "failed";
+
 export type RenderedMessage = {
   id: string;
   senderId: string;
@@ -6,6 +8,10 @@ export type RenderedMessage = {
   text: string | null;
   createdAt: string;
   updatedAt: string | null;
+  clientId?: string;
+  deliveryStatus?: MessageDeliveryStatus;
+  errorMessage?: string | null;
+  isOptimistic?: boolean;
   image: {
     url: string;
     alt: string;

@@ -123,6 +123,30 @@ function IconCross16() {
   );
 }
 
+function renderOutgoingDeliveryStatus(message: RenderedMessage) {
+  if (message.deliveryStatus === "failed") {
+    return (
+      <span className="select-none text-[#F5B7B1]" title={message.errorMessage ?? "Сообщение не отправлено"}>
+        !
+      </span>
+    );
+  }
+
+  if (message.deliveryStatus === "pending") {
+    return (
+      <span aria-hidden="true" className="select-none">
+        ✓
+      </span>
+    );
+  }
+
+  return (
+    <span aria-hidden="true" className="select-none">
+      ✓✓
+    </span>
+  );
+}
+
 export function MessageList({
   currentUserId,
   messages,
@@ -190,6 +214,7 @@ export function MessageList({
           const spacingClass = index === 0 ? "" : meta.isGroupedWithPrev ? "mt-1" : "mt-3";
           const alignmentClass = meta.isOutgoing ? "justify-end" : "justify-start";
           const bubbleColor = meta.isOutgoing ? "bg-[#2B5278]" : "bg-[#182533]";
+          const canManageMessage = meta.isOutgoing && (!message.isOptimistic || message.deliveryStatus === "sent");
           const shouldShowTail = meta.isGroupEnd;
           const tailClass = shouldShowTail
             ? meta.isOutgoing
@@ -243,15 +268,15 @@ export function MessageList({
                       data-group-end={meta.isGroupEnd ? "true" : "false"}
                       data-outgoing={meta.isOutgoing ? "true" : "false"}
                       className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass}`}
-                      tabIndex={meta.isOutgoing ? 0 : undefined}
-                      role={meta.isOutgoing ? "group" : undefined}
+                      tabIndex={canManageMessage ? 0 : undefined}
+                      role={canManageMessage ? "group" : undefined}
                       aria-label={
                         meta.isOutgoing
                           ? `Сообщение, ${formatMessageTime(message.createdAt)}`
                           : undefined
                       }
                       onPointerDown={
-                        meta.isOutgoing
+                        canManageMessage
                           ? (e) => {
                               if (e.button !== 0) return;
                               clearLongPressTimer();
@@ -267,7 +292,7 @@ export function MessageList({
                           : undefined
                       }
                       onPointerUp={
-                        meta.isOutgoing
+                        canManageMessage
                           ? (e) => {
                               if (e.pointerId !== longPressPointerIdRef.current) return;
                               clearLongPressTimer();
@@ -280,14 +305,14 @@ export function MessageList({
                           : undefined
                       }
                       onPointerMove={
-                        meta.isOutgoing
+                        canManageMessage
                           ? (e) => {
                               if (e.pointerId === longPressPointerIdRef.current) clearLongPressTimer();
                             }
                           : undefined
                       }
                       onPointerCancel={
-                        meta.isOutgoing
+                        canManageMessage
                           ? (e) => {
                               if (e.pointerId === longPressPointerIdRef.current) clearLongPressTimer();
                             }
@@ -314,7 +339,7 @@ export function MessageList({
                           meta.isOutgoing ? "justify-between text-[#B7C9DA]" : "justify-end text-[#8FA1B3]"
                         }`}
                       >
-                        {meta.isOutgoing ? (
+                        {canManageMessage ? (
                           <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                             <button
                               type="button"
@@ -343,16 +368,12 @@ export function MessageList({
                               изменено в {formatMessageTime(message.updatedAt)}
                             </span>
                           ) : null}
-                          {meta.isOutgoing ? (
-                            <span aria-hidden="true" className="select-none">
-                              ✓✓
-                            </span>
-                          ) : null}
+                          {meta.isOutgoing ? renderOutgoingDeliveryStatus(message) : null}
                         </div>
                       </div>
                     </article>
 
-                    {meta.isOutgoing && contextMenuMessageId === message.id ? (
+                    {canManageMessage && contextMenuMessageId === message.id ? (
                       <div
                         ref={contextMenuRef}
                         role="menu"
