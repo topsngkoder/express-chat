@@ -296,6 +296,7 @@ export function ChatShell({
             const result = await createMessageFormAction(initialMessageComposerState, formData);
 
             if (result.success && result.message) {
+              const confirmedMessage: RenderedMessage = result.message;
               const previewUrl = objectUrlByClientIdRef.current.get(clientId);
 
               if (previewUrl) {
@@ -307,7 +308,7 @@ export function ChatShell({
                 current.map((message) =>
                   message.clientId === clientId
                     ? {
-                        ...result.message,
+                        ...confirmedMessage,
                         clientId,
                         deliveryStatus: "sent",
                         errorMessage: null,
