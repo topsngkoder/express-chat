@@ -1,4 +1,9 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
+
+const LONG_PRESS_MS = 450;
 
 type MessageListProps = {
   currentUserId: string;
@@ -6,6 +11,8 @@ type MessageListProps = {
   hasMore: boolean;
   loadingOlder?: boolean;
   onLoadOlder?: () => void;
+  onEditMessage?: (messageId: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
@@ -97,13 +104,61 @@ function buildGroupMeta(messages: RenderedMessage[], currentUserId: string): Mes
   });
 }
 
+function IconPencil16() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M8.6 3.4L12.6 7.4L4 16H0v-4l8.6-8.6zm1.4-1.4L14 2l-2-2-1.4 1.4L12.6 4 10 1.4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function IconCross16() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function MessageList({
   currentUserId,
   messages,
   hasMore,
   loadingOlder,
   onLoadOlder,
+  onEditMessage,
+  onDeleteMessage,
 }: MessageListProps) {
+  const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+  const longPressPointerIdRef = useRef<number | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressPointerIdRef.current = null;
+  }, []);
+
+  useEffect(() => () => clearLongPressTimer(), [clearLongPressTimer]);
+
+  useEffect(() => {
+    if (!contextMenuMessageId) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenuMessageId(null);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [contextMenuMessageId]);
+
   if (messages.length === 0) {
     return (
       <div className="mt-4 flex min-h-56 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-400">
@@ -170,7 +225,9 @@ export function MessageList({
                   </div>
                 ) : null}
 
-                <div className="flex min-w-0 flex-col">
+                <div
+                  className={`flex min-w-0 flex-col ${meta.isOutgoing ? "group relative" : ""}`}
+                >
                   {shouldShowSenderName ? (
                     <p
                       className="mb-1 truncate text-xs font-semibold leading-4"
@@ -180,41 +237,151 @@ export function MessageList({
                     </p>
                   ) : null}
 
-                  <article
-                    data-group-start={meta.isGroupStart ? "true" : "false"}
-                    data-group-end={meta.isGroupEnd ? "true" : "false"}
-                    data-outgoing={meta.isOutgoing ? "true" : "false"}
-                    className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass}`}
-                  >
-                    {message.text ? (
-                      <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
-                    ) : null}
+                  <div className="relative inline-block max-w-full self-end">
+                    <article
+                      data-group-start={meta.isGroupStart ? "true" : "false"}
+                      data-group-end={meta.isGroupEnd ? "true" : "false"}
+                      data-outgoing={meta.isOutgoing ? "true" : "false"}
+                      className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass}`}
+                      tabIndex={meta.isOutgoing ? 0 : undefined}
+                      role={meta.isOutgoing ? "group" : undefined}
+                      aria-label={
+                        meta.isOutgoing
+                          ? `Сообщение, ${formatMessageTime(message.createdAt)}`
+                          : undefined
+                      }
+                      onPointerDown={
+                        meta.isOutgoing
+                          ? (e) => {
+                              if (e.button !== 0) return;
+                              clearLongPressTimer();
+                              longPressPointerIdRef.current = e.pointerId;
+                              longPressFiredRef.current = false;
+                              longPressTimerRef.current = setTimeout(() => {
+                                longPressTimerRef.current = null;
+                                longPressPointerIdRef.current = null;
+                                longPressFiredRef.current = true;
+                                setContextMenuMessageId(message.id);
+                              }, LONG_PRESS_MS);
+                            }
+                          : undefined
+                      }
+                      onPointerUp={
+                        meta.isOutgoing
+                          ? (e) => {
+                              if (e.pointerId !== longPressPointerIdRef.current) return;
+                              clearLongPressTimer();
+                              if (longPressFiredRef.current) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                longPressFiredRef.current = false;
+                              }
+                            }
+                          : undefined
+                      }
+                      onPointerMove={
+                        meta.isOutgoing
+                          ? (e) => {
+                              if (e.pointerId === longPressPointerIdRef.current) clearLongPressTimer();
+                            }
+                          : undefined
+                      }
+                      onPointerCancel={
+                        meta.isOutgoing
+                          ? (e) => {
+                              if (e.pointerId === longPressPointerIdRef.current) clearLongPressTimer();
+                            }
+                          : undefined
+                      }
+                    >
+                      {message.text ? (
+                        <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
+                      ) : null}
 
-                    {message.image ? (
-                      <div className={message.text ? "mt-2 overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
-                        <img
-                          alt={message.image.alt}
-                          className="block max-h-[320px] w-full rounded-xl object-contain sm:max-h-[420px]"
-                          loading="lazy"
-                          src={message.image.url}
-                        />
+                      {message.image ? (
+                        <div className={message.text ? "mt-2 overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
+                          <img
+                            alt={message.image.alt}
+                            className="block max-h-[320px] w-full rounded-xl object-contain sm:max-h-[420px]"
+                            loading="lazy"
+                            src={message.image.url}
+                          />
+                        </div>
+                      ) : null}
+
+                      <div
+                        className={`mt-1 flex items-center gap-1 text-[11px] leading-4 ${
+                          meta.isOutgoing ? "justify-between text-[#B7C9DA]" : "justify-end text-[#8FA1B3]"
+                        }`}
+                      >
+                        {meta.isOutgoing ? (
+                          <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#2B5278]"
+                              aria-label="Редактировать сообщение"
+                              onClick={() => onEditMessage?.(message.id)}
+                            >
+                              <IconPencil16 />
+                            </button>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#2B5278]"
+                              aria-label="Удалить сообщение"
+                              onClick={() => onDeleteMessage?.(message.id)}
+                            >
+                              <IconCross16 />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="min-w-0 flex-1" />
+                        )}
+                        <div className="flex shrink-0 items-center gap-1">
+                          <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
+                          {meta.isOutgoing && message.updatedAt ? <span className="ml-1">изменено</span> : null}
+                          {meta.isOutgoing ? (
+                            <span aria-hidden="true" className="select-none">
+                              ✓✓
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+
+                    {meta.isOutgoing && contextMenuMessageId === message.id ? (
+                      <div
+                        ref={contextMenuRef}
+                        role="menu"
+                        className="absolute left-0 top-full z-10 mt-1 min-w-[180px] rounded-xl border border-[#22303D] bg-[#182533] py-1 shadow-lg"
+                        aria-label="Действия с сообщением"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#22303D] focus:bg-[#22303D] focus:outline-none"
+                          onClick={() => {
+                            onEditMessage?.(message.id);
+                            setContextMenuMessageId(null);
+                          }}
+                        >
+                          <IconPencil16 />
+                          Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#8B2635] focus:bg-[#8B2635] focus:outline-none"
+                          onClick={() => {
+                            onDeleteMessage?.(message.id);
+                            setContextMenuMessageId(null);
+                          }}
+                        >
+                          <IconCross16 />
+                          Удалить
+                        </button>
                       </div>
                     ) : null}
-
-                    <div
-                      className={`mt-1 flex items-center justify-end gap-1 text-[11px] leading-4 ${
-                        meta.isOutgoing ? "text-[#B7C9DA]" : "text-[#8FA1B3]"
-                      }`}
-                    >
-                      <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
-                      {meta.isOutgoing && message.updatedAt ? <span className="ml-1">изменено</span> : null}
-                      {meta.isOutgoing ? (
-                        <span aria-hidden="true" className="select-none">
-                          ✓✓
-                        </span>
-                      ) : null}
-                    </div>
-                  </article>
+                  </div>
                 </div>
               </div>
             </div>
