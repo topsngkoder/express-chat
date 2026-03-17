@@ -1,12 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isRedirectError } from "next/navigation";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import { NotificationPermissionCard } from "@/components/chat/notification-permission-card";
 import { ProfileBlock } from "@/components/settings/profile-block";
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
 import { getOrCreateCurrentProfile, getAvatarSignedUrl } from "@/lib/profile/profile-service";
+
+function isNextRedirectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const digest = (error as { digest?: unknown }).digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
 
 export const metadata: Metadata = {
   title: "Настройки",
@@ -27,7 +35,7 @@ export default async function SettingsPage() {
       // Не ломаем страницу при сбое Storage: показываем профиль без картинки аватара
     }
   } catch (error) {
-    if (isRedirectError(error)) throw error;
+    if (isNextRedirectError(error)) throw error;
     return (
       <main className="min-h-screen bg-zinc-50 px-3 py-4 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50 sm:px-4 sm:py-6">
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
