@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireConfirmedUser } from "@/lib/auth/require-confirmed-user";
 import { AppError } from "@/lib/errors";
-import { listMessagesAfterCursor } from "@/lib/messages/list-messages";
+import { listMessagesAfterCursor, listMessagesPage, type MessageListCursor } from "@/lib/messages/list-messages";
 import { createMessage } from "@/lib/messages/create-message";
 import { renderMessageForChat, renderMessagesForChat } from "@/lib/messages/render-message";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
@@ -172,5 +172,58 @@ export async function backfillMessagesAfterCursorAction(
     );
   } catch {
     return [];
+  }
+}
+
+type LoadOlderMessagesPageInput = {
+  cursor: MessageListCursor | null;
+};
+
+function isLoadOlderMessagesPageInput(value: unknown): value is LoadOlderMessagesPageInput {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const cursor = candidate.cursor as unknown;
+
+  if (cursor === null) {
+    return true;
+  }
+
+  return isMessageCursorInput(cursor);
+}
+
+export async function loadOlderMessagesPageAction(input: LoadOlderMessagesPageInput): Promise<{
+  messages: RenderedMessage[];
+  nextCursor: MessageListCursor | null;
+}> {
+  try {
+    await requireConfirmedUser();
+
+    if (!isLoadOlderMessagesPageInput(input)) {
+      return { messages: [], nextCursor: null };
+    }
+
+    const page = await listMessagesPage(input.cursor);
+
+    const messages = await renderMessagesForChat(
+      page.items.map((item) => ({
+        id: item.id,
+        senderId: item.senderId,
+        senderName: item.senderName,
+        text: item.text,
+        imagePath: item.imagePath,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      })),
+    );
+
+    return {
+      messages,
+      nextCursor: page.nextCursor,
+    };
+  } catch {
+    return { messages: [], nextCursor: null };
   }
 }

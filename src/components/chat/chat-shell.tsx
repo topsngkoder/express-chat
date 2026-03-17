@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MessageListCursor } from "@/lib/messages/list-messages";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
@@ -41,13 +41,15 @@ export function ChatShell({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
   const latestInsertRef = useRef<string | null>(null);
+  const didInitialScrollRef = useRef(false);
+  const isAtBottomRef = useRef(true);
 
   const [cursor] = useState<MessageListCursor | null>(initialCursor);
   const [hasMore] = useState(initialHasMore);
   const [loadingMore] = useState(false);
 
-  const [unseenCount] = useState(0);
-  const [isAtBottom] = useState(true);
+  const [unseenCount, setUnseenCount] = useState(0);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   const [editDraft] = useState<ChatEditDraft>(null);
   const [modalState] = useState<ChatModalState>(null);
@@ -60,6 +62,73 @@ export function ChatShell({
   void modalState;
   void composerRef;
   void latestInsertRef;
+
+  const scrollToBottom = useCallback(() => {
+    const node = scrollRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.scrollTop = node.scrollHeight;
+  }, []);
+
+  const computeIsAtBottom = useCallback((): boolean => {
+    const node = scrollRef.current;
+    if (!node) {
+      return true;
+    }
+
+    const distanceToBottom = node.scrollHeight - (node.scrollTop + node.clientHeight);
+    return distanceToBottom <= 120;
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const nextIsAtBottom = computeIsAtBottom();
+    isAtBottomRef.current = nextIsAtBottom;
+    setIsAtBottom(nextIsAtBottom);
+
+    if (nextIsAtBottom) {
+      setUnseenCount(0);
+    }
+  }, [computeIsAtBottom]);
+
+  useEffect(() => {
+    if (didInitialScrollRef.current) {
+      return;
+    }
+
+    didInitialScrollRef.current = true;
+
+    const node = scrollRef.current;
+    if (!node) {
+      return;
+    }
+
+    // Ждём layout, чтобы высоты были финальными для первого кадра.
+    requestAnimationFrame(() => {
+      scrollToBottom();
+      requestAnimationFrame(scrollToBottom);
+    });
+  }, [scrollToBottom]);
+
+  useEffect(() => {
+    // Инициализация состояния “у низа” после первого layout.
+    requestAnimationFrame(handleScroll);
+  }, [handleScroll]);
+
+  const handleRealtimeInsert = useCallback(
+    (message: RenderedMessage) => {
+      latestInsertRef.current = message.id;
+
+      if (isAtBottomRef.current) {
+        requestAnimationFrame(scrollToBottom);
+        return;
+      }
+
+      setUnseenCount((current) => current + 1);
+    },
+    [scrollToBottom],
+  );
 
   return (
     <main className="dark h-dvh overflow-hidden bg-[#0E1621] text-[#E6EEF7]">
@@ -100,14 +169,33 @@ export function ChatShell({
 
         <section
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+          className="relative min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+          onScroll={handleScroll}
         >
           <LiveMessageList
             currentUserId={currentUserId}
             hasMore={hasMore}
             initialMessages={initialMessages}
             loadedPages={initialLoadedPages}
+            onRealtimeInsert={handleRealtimeInsert}
           />
+
+          {unseenCount > 0 && !isAtBottom ? (
+            <div className="pointer-events-none sticky bottom-3 left-0 right-0 flex justify-center">
+              <button
+                aria-label="Прокрутить к новым сообщениям"
+                className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-[#2B5278] px-4 py-2 text-sm font-semibold text-[#E6EEF7] shadow-lg shadow-black/20 transition hover:bg-[#336192] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                type="button"
+                onClick={() => {
+                  scrollToBottom();
+                  setUnseenCount(0);
+                }}
+              >
+                <span aria-hidden="true">↓</span>
+                <span>{unseenCount} новых</span>
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <footer

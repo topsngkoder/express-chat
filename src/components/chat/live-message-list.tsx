@@ -136,18 +136,27 @@ export function LiveMessageList({
   initialMessages,
   hasMore,
   loadedPages,
+  onRealtimeInsert,
 }: {
   currentUserId: string;
   initialMessages: RenderedMessage[];
   hasMore: boolean;
   loadedPages: number;
+  onRealtimeInsert?: (message: RenderedMessage) => void;
 }) {
   const [realtimeMessages, setRealtimeMessages] = useState<RenderedMessage[]>([]);
+  const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
   const [connectionLost, setConnectionLost] = useState(false);
-  const messages = useMemo(
-    () => mergeRenderedMessages(initialMessages, realtimeMessages),
-    [initialMessages, realtimeMessages],
-  );
+  const messages = useMemo(() => {
+    const merged = mergeRenderedMessages(initialMessages, realtimeMessages);
+
+    if (deletedMessageIds.length === 0) {
+      return merged;
+    }
+
+    const deletedIdSet = new Set(deletedMessageIds);
+    return merged.filter((message) => !deletedIdSet.has(message.id));
+  }, [initialMessages, realtimeMessages, deletedMessageIds]);
   const latestMessage = useMemo(() => {
     if (messages.length === 0) {
       return null;
@@ -214,6 +223,7 @@ export function LiveMessageList({
             }
 
             showBrowserNotification(renderedMessage, currentUserId);
+            onRealtimeInsert?.(renderedMessage);
             setRealtimeMessages((current) => upsertRealtimeRenderedMessage(current, renderedMessage));
           })();
         },
@@ -266,6 +276,10 @@ export function LiveMessageList({
           }
 
           logInfo("chat.realtime_delete_received", { messageId: deletedId });
+          setDeletedMessageIds((current) =>
+            current.includes(deletedId) ? current : [...current, deletedId],
+          );
+          setRealtimeMessages((current) => current.filter((message) => message.id !== deletedId));
         },
       )
       .subscribe((status) => {
@@ -294,7 +308,7 @@ export function LiveMessageList({
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [currentUserId, onRealtimeInsert]);
 
   return (
     <div className="mt-4 space-y-4">
