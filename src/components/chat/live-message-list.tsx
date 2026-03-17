@@ -24,10 +24,26 @@ type RealtimeMessageRow = {
   text: string | null;
   image_path: string | null;
   created_at: string;
+  updated_at: string | null;
 };
 
 const NOTIFICATION_PREVIEW_LIMIT = 120;
 const NOTIFICATION_CLOSE_DELAY_MS = 5000;
+
+function upsertRealtimeRenderedMessage(
+  current: RenderedMessage[],
+  incoming: RenderedMessage,
+): RenderedMessage[] {
+  const existingIndex = current.findIndex((message) => message.id === incoming.id);
+
+  if (existingIndex === -1) {
+    return mergeRenderedMessages(current, [incoming]);
+  }
+
+  const next = [...current];
+  next[existingIndex] = incoming;
+  return next;
+}
 
 function isRealtimeMessageRow(value: unknown): value is RealtimeMessageRow {
   if (!value || typeof value !== "object") {
@@ -41,6 +57,7 @@ function isRealtimeMessageRow(value: unknown): value is RealtimeMessageRow {
     typeof candidate.sender_id === "string" &&
     typeof candidate.sender_email === "string" &&
     typeof candidate.created_at === "string" &&
+    (typeof candidate.updated_at === "string" || candidate.updated_at === null) &&
     (typeof candidate.text === "string" || candidate.text === null) &&
     (typeof candidate.image_path === "string" || candidate.image_path === null)
   );
@@ -189,6 +206,7 @@ export function LiveMessageList({
               text: payload.new.text,
               imagePath: payload.new.image_path,
               createdAt: payload.new.created_at,
+              updatedAt: payload.new.updated_at,
             });
 
             if (!active || !renderedMessage) {
@@ -196,8 +214,58 @@ export function LiveMessageList({
             }
 
             showBrowserNotification(renderedMessage, currentUserId);
-            setRealtimeMessages((current) => mergeRenderedMessages(current, [renderedMessage]));
+            setRealtimeMessages((current) => upsertRealtimeRenderedMessage(current, renderedMessage));
           })();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          if (!isRealtimeMessageRow(payload.new)) {
+            return;
+          }
+
+          void (async () => {
+            const renderedMessage = await hydrateRealtimeMessageAction({
+              id: payload.new.id,
+              senderId: payload.new.sender_id,
+              senderEmail: payload.new.sender_email,
+              senderDisplayName: payload.new.sender_display_name ?? null,
+              text: payload.new.text,
+              imagePath: payload.new.image_path,
+              createdAt: payload.new.created_at,
+              updatedAt: payload.new.updated_at,
+            });
+
+            if (!active || !renderedMessage) {
+              return;
+            }
+
+            setRealtimeMessages((current) => upsertRealtimeRenderedMessage(current, renderedMessage));
+          })();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          const oldRow = payload.old as { id?: unknown } | null;
+          const deletedId = typeof oldRow?.id === "string" ? oldRow.id : null;
+
+          if (!deletedId) {
+            return;
+          }
+
+          logInfo("chat.realtime_delete_received", { messageId: deletedId });
         },
       )
       .subscribe((status) => {
