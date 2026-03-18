@@ -14,7 +14,7 @@ export function LogoutButton({ className }: LogoutButtonProps) {
         }
         type="submit"
       >
-        Выйти
+        Выйти из чата
       </button>
     </form>
   );

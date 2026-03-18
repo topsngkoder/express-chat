@@ -72,27 +72,66 @@ export function ProfileBlock({
       </h2>
 
       <div className="mt-4 flex flex-col gap-6 sm:flex-row sm:items-start">
-        <div className="flex shrink-0">
-          {initialAvatarSignedUrl ? (
-            <img
-              src={initialAvatarSignedUrl}
-              alt=""
-              className="h-20 w-20 rounded-full object-cover"
+        <div className="relative flex shrink-0">
+          <form action={uploadAction} id="avatar-upload-form">
+            <input
+              id="avatar-file"
+              accept="image/*"
+              className="sr-only"
+              disabled={avatarPending}
+              name="avatar"
+              type="file"
+              onChange={(e) => {
+                const form = e.target.form;
+                if (form && e.target.files?.[0]) form.requestSubmit();
+              }}
             />
-          ) : (
-            <div
-              className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-200 text-xl font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
-              aria-hidden
+            <label
+              htmlFor="avatar-file"
+              className="block cursor-pointer rounded-full outline-none ring-zinc-400 focus-visible:ring-2 focus-visible:ring-offset-2 dark:ring-zinc-500"
+              title="Нажмите, чтобы сменить аватар"
             >
-              {getInitials(initialDisplayName, userEmail)}
-            </div>
+              {initialAvatarSignedUrl ? (
+                <img
+                  src={initialAvatarSignedUrl}
+                  alt=""
+                  className="h-20 w-20 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-200 text-xl font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300"
+                  aria-hidden
+                >
+                  {getInitials(initialDisplayName, userEmail)}
+                </div>
+              )}
+            </label>
+          </form>
+          {initialAvatarSignedUrl && (
+            <form
+              action={removeAction}
+              className="absolute -right-1 -top-1 z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="submit"
+                disabled={avatarPending}
+                title="Удалить аватар"
+                className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-red-500/50 text-white shadow transition hover:bg-red-600/50 disabled:opacity-60 dark:border-zinc-900 dark:bg-red-500/50 dark:hover:bg-red-600/50"
+              >
+                <span className="sr-only">Удалить аватар</span>
+                <span aria-hidden className="text-sm leading-none">
+                  ×
+                </span>
+              </button>
+            </form>
           )}
         </div>
 
         <div className="min-w-0 flex-1 space-y-4">
           <form action={displayNameAction} className="space-y-2">
             <label className="block text-sm font-medium" htmlFor="settings-display-name">
-              Ник
+              Имя
             </label>
             <input
               defaultValue={initialDisplayName ?? ""}
@@ -121,42 +160,12 @@ export function ProfileBlock({
             )}
             {displayNameState.success && !displayNamePending && (
               <p className="text-sm text-green-600 dark:text-green-400" role="status">
-                Ник сохранён.
+                Имя сохранено.
               </p>
             )}
           </form>
 
-          <div className="space-y-2">
-            <span className="block text-sm font-medium">Аватар</span>
-            <div className="flex flex-wrap items-center gap-2">
-              <form action={uploadAction} className="flex items-center gap-2">
-                <label className="cursor-pointer rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800">
-                  {uploadPending ? "Загрузка…" : "Выбрать файл"}
-                  <input
-                    accept="image/*"
-                    className="sr-only"
-                    disabled={avatarPending}
-                    name="avatar"
-                    type="file"
-                    onChange={(e) => {
-                      const form = e.target.form;
-                      if (form && e.target.files?.[0]) form.requestSubmit();
-                    }}
-                  />
-                </label>
-              </form>
-              {initialAvatarSignedUrl && (
-                <form action={removeAction}>
-                  <button
-                    type="submit"
-                    disabled={avatarPending}
-                    className="rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50 dark:hover:bg-zinc-800"
-                  >
-                    {removePending ? "Удаление…" : "Удалить аватар"}
-                  </button>
-                </form>
-              )}
-            </div>
+          <div className="space-y-1">
             {avatarError && (
               <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                 {avatarError}

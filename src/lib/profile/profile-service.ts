@@ -14,7 +14,7 @@ const AVATARS_BUCKET = "avatars";
 const AVATAR_SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 const PROFILE_SAVE_ERROR_MESSAGE = "Не удалось сохранить профиль. Попробуйте позже";
-const DISPLAY_NAME_LENGTH_ERROR_MESSAGE = "Ник должен быть от 2 до 50 символов";
+const DISPLAY_NAME_LENGTH_ERROR_MESSAGE = "Имя должно быть от 2 до 50 символов";
 const DISPLAY_NAME_CHARSET_ERROR_MESSAGE =
   "В нике допустимы только буквы, цифры, пробел, дефис и подчёркивание";
 const AVATAR_UPLOAD_ERROR_MESSAGE = "Не удалось загрузить аватар. Попробуйте позже";
