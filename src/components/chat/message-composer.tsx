@@ -37,6 +37,8 @@ export type MessageComposerComposeProps = {
   /** Активный ответ на сообщение; передаётся в submit и в reply panel. */
   replyDraft?: MessageReplyTo | null;
   onCancelReply?: () => void;
+  /** Позволяет родителю управлять фокусом textarea (для Reply и т.п.). */
+  textareaRef?: React.MutableRefObject<HTMLTextAreaElement | null>;
 };
 
 export type MessageComposerSubmitInput = {
@@ -462,8 +464,14 @@ export function MessageComposer(props: MessageComposerProps) {
             </button>
           ) : null}
 
-          <textarea
-          ref={textareaRef}
+        <textarea
+          ref={(node) => {
+            textareaRef.current = node;
+            if (!isEditMode) {
+              const external = (props as MessageComposerComposeProps).textareaRef;
+              if (external) external.current = node;
+            }
+          }}
           className="min-h-10 w-full flex-1 resize-none overflow-y-hidden bg-transparent px-2 py-2 text-sm leading-5 text-[#E6EEF7] outline-none placeholder:text-[#607382] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isBusy}
           id="message-text"

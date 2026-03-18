@@ -66,6 +66,7 @@ export function ChatShell({
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const latestInsertRef = useRef<string | null>(null);
   const didInitialScrollRef = useRef(false);
   const isAtBottomRef = useRef(true);
@@ -90,6 +91,7 @@ export function ChatShell({
   void unseenCount;
   void isAtBottom;
   void composerRef;
+  void composerTextareaRef;
   void latestInsertRef;
   void initialLoadedPages;
   void initialCursor;
@@ -282,6 +284,27 @@ export function ChatShell({
   const handleRequestReply = useCallback((message: RenderedMessage) => {
     setEditDraft(null);
     setActiveReplyDraft(buildReplySnapshotFromMessage(message));
+
+    // Важно для мобилки: фокус по user gesture -> открывается клавиатура.
+    // Когда мы выходим из edit-mode, textarea может смонтироваться на следующем кадре.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const ta = composerTextareaRef.current;
+        if (!ta) return;
+        try {
+          ta.focus({ preventScroll: true });
+        } catch {
+          ta.focus();
+        }
+        // Курсор в конец — чтобы сразу печатать.
+        const end = ta.value.length;
+        try {
+          ta.setSelectionRange(end, end);
+        } catch {
+          // ignore (например, если браузер запретил)
+        }
+      });
+    });
   }, []);
 
   const handleNavigateToReply = useCallback((replyToMessageId: string) => {
@@ -543,6 +566,7 @@ export function ChatShell({
               <MessageComposer
                 key="compose"
                 replyDraft={activeReplyDraft}
+                textareaRef={composerTextareaRef}
                 onCancelReply={() => setActiveReplyDraft(null)}
                 onSubmitMessage={handleSubmitMessage}
               />
