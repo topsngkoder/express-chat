@@ -27,6 +27,11 @@ type RealtimeMessageRow = {
   image_path: string | null;
   created_at: string;
   updated_at: string | null;
+  reply_to_message_id?: string | null;
+  reply_to_sender_id?: string | null;
+  reply_to_sender_name?: string | null;
+  reply_to_preview_text?: string | null;
+  reply_to_has_image?: boolean | null;
 };
 
 const NOTIFICATION_PREVIEW_LIMIT = 120;
@@ -248,15 +253,21 @@ export function LiveMessageList({
           }
 
           void (async () => {
+            const row = payload.new as RealtimeMessageRow;
             const renderedMessage = await hydrateRealtimeMessageAction({
-              id: payload.new.id,
-              senderId: payload.new.sender_id,
-              senderEmail: payload.new.sender_email,
-              senderDisplayName: payload.new.sender_display_name ?? null,
-              text: payload.new.text,
-              imagePath: payload.new.image_path,
-              createdAt: payload.new.created_at,
-              updatedAt: payload.new.updated_at,
+              id: row.id,
+              senderId: row.sender_id,
+              senderEmail: row.sender_email,
+              senderDisplayName: row.sender_display_name ?? null,
+              text: row.text,
+              imagePath: row.image_path,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+              replyToMessageId: row.reply_to_message_id,
+              replyToSenderId: row.reply_to_sender_id,
+              replyToSenderName: row.reply_to_sender_name,
+              replyToPreviewText: row.reply_to_preview_text,
+              replyToHasImage: row.reply_to_has_image,
             });
 
             if (!active || !renderedMessage) {
@@ -282,15 +293,21 @@ export function LiveMessageList({
           }
 
           void (async () => {
+            const row = payload.new as RealtimeMessageRow;
             const renderedMessage = await hydrateRealtimeMessageAction({
-              id: payload.new.id,
-              senderId: payload.new.sender_id,
-              senderEmail: payload.new.sender_email,
-              senderDisplayName: payload.new.sender_display_name ?? null,
-              text: payload.new.text,
-              imagePath: payload.new.image_path,
-              createdAt: payload.new.created_at,
-              updatedAt: payload.new.updated_at,
+              id: row.id,
+              senderId: row.sender_id,
+              senderEmail: row.sender_email,
+              senderDisplayName: row.sender_display_name ?? null,
+              text: row.text,
+              imagePath: row.image_path,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+              replyToMessageId: row.reply_to_message_id,
+              replyToSenderId: row.reply_to_sender_id,
+              replyToSenderName: row.reply_to_sender_name,
+              replyToPreviewText: row.reply_to_preview_text,
+              replyToHasImage: row.reply_to_has_image,
             });
 
             if (!active || !renderedMessage) {

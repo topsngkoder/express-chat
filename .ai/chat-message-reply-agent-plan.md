@@ -88,10 +88,10 @@
 
 ### D. Realtime / SSR / pagination consistency
 
-- [ ] **D1**: SSR должен возвращать `replyTo`.
-- [ ] **D2**: Realtime `INSERT` / `UPDATE` должны возвращать `replyTo`.
-- [ ] **D3**: Older pages должны возвращать `replyTo` в том же формате.
-- [ ] **D4**: Проверить, что удаление исходного сообщения приводит к realtime-обновлению reply rows с `messageId = null`.
+- [x] **D1**: SSR должен возвращать `replyTo`. (уже обеспечено: `page.tsx` → `renderMessagesForChat` с reply-полями из `listMessagesPage`; `render-message.ts` собирает `replyTo` через `buildReplyToFromRow`.)
+- [x] **D2**: Realtime `INSERT` / `UPDATE` должны возвращать `replyTo`. (расширен `HydrateRealtimeMessageInput` и передача reply-полей в `renderMessageForChat`; в `live-message-list` тип `RealtimeMessageRow` и вызовы hydrate при INSERT/UPDATE передают reply из payload.)
+- [x] **D3**: Older pages должны возвращать `replyTo` в том же формате. (уже обеспечено: `loadOlderMessagesPageAction` → `listMessagesPage` → `renderMessagesForChat` с reply-полями из items.)
+- [x] **D4**: Проверить, что удаление исходного сообщения приводит к realtime-обновлению reply rows с `messageId = null`. (Код готов: при UPDATE приходит payload с `reply_to_message_id = null`, `buildReplyToFromRow` даёт `messageId: null`, `isNavigable: false`. Проверка вручную: удалить исходное сообщение в одном клиенте — в другом у ответа цитата остаётся, переход по ней недоступен; при необходимости убедиться, что таблица `messages` в Realtime publication и что приходят UPDATE-события.)
 
 ### E. Reply action в message actions
 

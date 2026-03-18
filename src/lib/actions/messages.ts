@@ -28,6 +28,11 @@ type HydrateRealtimeMessageInput = {
   imagePath: string | null;
   createdAt: string;
   updatedAt?: string | null;
+  replyToMessageId?: string | null;
+  replyToSenderId?: string | null;
+  replyToSenderName?: string | null;
+  replyToPreviewText?: string | null;
+  replyToHasImage?: boolean | null;
 };
 
 type MessageCursorInput = {
@@ -155,8 +160,24 @@ function isHydrateRealtimeMessageInput(value: unknown): value is HydrateRealtime
   const candidate = value as Record<string, unknown>;
 
   const senderDisplayName = (candidate as HydrateRealtimeMessageInput).senderDisplayName;
-
   const updatedAt = (candidate as HydrateRealtimeMessageInput).updatedAt;
+
+  const replyOk =
+    (candidate.replyToMessageId === undefined ||
+      candidate.replyToMessageId === null ||
+      typeof candidate.replyToMessageId === "string") &&
+    (candidate.replyToSenderId === undefined ||
+      candidate.replyToSenderId === null ||
+      typeof candidate.replyToSenderId === "string") &&
+    (candidate.replyToSenderName === undefined ||
+      candidate.replyToSenderName === null ||
+      typeof candidate.replyToSenderName === "string") &&
+    (candidate.replyToPreviewText === undefined ||
+      candidate.replyToPreviewText === null ||
+      typeof candidate.replyToPreviewText === "string") &&
+    (candidate.replyToHasImage === undefined ||
+      candidate.replyToHasImage === null ||
+      typeof candidate.replyToHasImage === "boolean");
 
   return (
     typeof candidate.id === "string" &&
@@ -168,7 +189,8 @@ function isHydrateRealtimeMessageInput(value: unknown): value is HydrateRealtime
     (updatedAt === undefined || updatedAt === null || typeof updatedAt === "string") &&
     (senderDisplayName === undefined ||
       senderDisplayName === null ||
-      typeof senderDisplayName === "string")
+      typeof senderDisplayName === "string") &&
+    replyOk
   );
 }
 
@@ -208,6 +230,11 @@ export async function hydrateRealtimeMessageAction(
       imagePath: input.imagePath,
       createdAt: input.createdAt,
       updatedAt: input.updatedAt ?? null,
+      replyToMessageId: input.replyToMessageId,
+      replyToSenderId: input.replyToSenderId,
+      replyToSenderName: input.replyToSenderName,
+      replyToPreviewText: input.replyToPreviewText,
+      replyToHasImage: input.replyToHasImage,
     });
   } catch {
     return null;
