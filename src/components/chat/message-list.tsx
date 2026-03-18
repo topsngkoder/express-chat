@@ -272,15 +272,6 @@ export function MessageList({
                 <div
                   className={`flex min-w-0 flex-col ${meta.isOutgoing ? "group relative" : ""}`}
                 >
-                  {shouldShowSenderName ? (
-                    <p
-                      className="mb-1 truncate text-xs font-semibold leading-4"
-                      style={{ color: senderNameColor ?? undefined }}
-                    >
-                      {message.senderName}
-                    </p>
-                  ) : null}
-
                   <div
                     className="relative inline-block max-w-full self-end"
                     ref={actionsExpandedMessageId === message.id ? expandedActionsBlockRef : undefined}
@@ -346,7 +337,15 @@ export function MessageList({
                             }
                           : undefined
                       }
-                    >
+                    > 
+                      {shouldShowSenderName ? (
+                        <p
+                          className="mb-1 truncate text-xs font-semibold leading-4"
+                          style={{ color: senderNameColor ?? undefined }}
+                        >
+                          {message.senderName}
+                        </p>
+                      ) : null}
                       {message.image ? (
                         <div className={message.text ? "overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
                           <img
