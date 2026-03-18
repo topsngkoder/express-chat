@@ -174,6 +174,16 @@ export function LiveMessageList({
   const pendingScrollRestoreRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(
     null,
   );
+  const messageElementByIdRef = useRef<Map<string, HTMLElement>>(new Map());
+
+  const registerMessageElement = useCallback((messageId: string, node: HTMLElement | null) => {
+    const map = messageElementByIdRef.current;
+    if (node) {
+      map.set(messageId, node);
+    } else {
+      map.delete(messageId);
+    }
+  }, []);
 
   useLayoutEffect(() => {
     const pending = pendingScrollRestoreRef.current;
@@ -411,6 +421,7 @@ export function LiveMessageList({
         onNavigateToReply={onNavigateToReply}
         onEditMessage={onEditMessage}
         onDeleteMessage={onDeleteMessage}
+        registerMessageElement={registerMessageElement}
       />
     </div>
   );

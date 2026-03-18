@@ -14,6 +14,7 @@ type MessageListProps = {
   onNavigateToReply?: (replyToMessageId: string) => void;
   onEditMessage?: (messageId: string, initialText: string | null, hasImage: boolean) => void;
   onDeleteMessage?: (messageId: string) => void;
+  registerMessageElement?: (messageId: string, node: HTMLElement | null) => void;
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
@@ -145,8 +146,10 @@ export function MessageList({
   loadingOlder,
   onLoadOlder,
   onReplyMessage,
+  onNavigateToReply,
   onEditMessage,
   onDeleteMessage,
+  registerMessageElement,
 }: MessageListProps) {
   const [actionsExpandedMessageId, setActionsExpandedMessageId] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -216,6 +219,7 @@ export function MessageList({
           const reserveAvatarSpace = !meta.isOutgoing;
           const shouldShowSenderName = !meta.isOutgoing && meta.isGroupStart;
           const senderNameColor = shouldShowSenderName ? hashSenderIdToColor(message.senderId) : null;
+          const replyAuthorColor = message.replyTo ? hashSenderIdToColor(message.replyTo.senderId) : null;
           const isImageOnly = Boolean(message.image) && !message.text;
           const bubblePaddingClass = isImageOnly
             ? "p-1"
@@ -225,7 +229,11 @@ export function MessageList({
           const metaRowClass = meta.isOutgoing ? "mt-1 text-[11px] leading-3" : "mt-1 text-[11px] leading-4";
 
           return (
-            <div key={message.id} className={`${spacingClass} flex ${alignmentClass}`}>
+            <div
+              key={message.id}
+              ref={(el) => registerMessageElement?.(message.id, el)}
+              className={`${spacingClass} flex ${alignmentClass}`}
+            >
               <div className={`flex items-end ${meta.isOutgoing ? "" : "gap-2"}`}>
                 {reserveAvatarSpace ? (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center">
@@ -280,25 +288,33 @@ export function MessageList({
                         </p>
                       ) : null}
 
-                      {message.replyTo ? (
+                      {/* Порядок в bubble по спеки: quote -> image -> text -> time/status. Цвет полосы и имени — автор исходного сообщения (7.3). */}
+                      {message.replyTo && replyAuthorColor ? (
                         <div
-                          className={`mb-2 flex gap-2 rounded-lg p-2 ${
+                          className={`mb-1.5 flex gap-2 rounded-[10px] p-2 ${
                             message.replyTo.isNavigable
                               ? "cursor-pointer bg-[#22303D]/50 hover:bg-[#22303D]/70"
-                              : "bg-[#22303D]/30"
+                              : "cursor-default bg-[#22303D]/30"
                           }`}
                           onClick={
                             message.replyTo.isNavigable && message.replyTo.messageId
                               ? () => onNavigateToReply?.(message.replyTo!.messageId!)
                               : undefined
                           }
+                          role={message.replyTo.isNavigable ? "button" : undefined}
+                          aria-label={
+                            message.replyTo.isNavigable ? "Перейти к сообщению" : undefined
+                          }
                         >
                           <div
                             className="h-full w-[3px] shrink-0 rounded-full"
-                            style={{ backgroundColor: senderNameColor ?? "#4CC9F0" }}
+                            style={{ backgroundColor: replyAuthorColor }}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold leading-4 text-[#E6EEF7]">
+                            <p
+                              className="truncate text-xs font-semibold leading-4"
+                              style={{ color: replyAuthorColor }}
+                            >
                               {message.replyTo.senderName}
                             </p>
                             <p className="truncate text-xs leading-4 text-[#B7C9DA]">
