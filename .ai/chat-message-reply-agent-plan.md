@@ -124,8 +124,8 @@
 - [x] **H1**: Реестр DOM-элементов сообщений по `message.id`.
 - [x] **H2**: Переход к already-loaded сообщению с центрированием.
 - [x] **H3**: Временная подсветка target bubble на `2000 ms`.
-- [ ] **H4**: Автодогрузка older pages до нахождения reply target или исчерпания истории.
-- [ ] **H5**: Игнор повторных кликов по той же цитате во время текущей догрузки.
+- [x] **H4**: Автодогрузка older pages до нахождения reply target или исчерпания истории.
+- [x] **H5**: Игнор повторных кликов по той же цитате во время текущей догрузки.
 
 ### I. Стабилизация UX и a11y
 
@@ -134,12 +134,20 @@
 - [ ] **I3**: Корректный pointer/cursor state у navigable / non-navigable quote block.
 - [ ] **I4**: Учет `prefers-reduced-motion` при scroll.
 
+Дополнение (bugfix по UX):
+
+- Клик по quote block внутри bubble не должен открывать меню действий сообщения. Реализовано через `event.stopPropagation()` в `src/components/chat/message-list.tsx` (обработчик клика по цитате).
+
 ### J. Самопроверка по спецификации
 
 - [ ] **J1**: Проверить acceptance criteria 1-15.
 - [ ] **J2**: Проверить сценарий delete original -> reply survives -> no navigation.
 - [ ] **J3**: Проверить сценарий edit original -> old reply snapshot unchanged.
 - [ ] **J4**: Проверить text-only / image-only / text+image source messages.
+
+Примечание (bugfix вне пунктов спеки):
+
+- Если удаляется собственное сообщение, которое уже находится в `optimisticMessages` (включая reply-сообщения), UI обязан убрать его сразу после успешного `deleteMessageAction`, даже если realtime DELETE не пришёл. Фикс реализован в `ChatShell.handleConfirmDelete` (удаление по `message.id` из `optimisticMessages`).
 
 ---
 

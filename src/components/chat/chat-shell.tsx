@@ -271,6 +271,7 @@ export function ChatShell({
 
     setDeleteLoading(false);
     if (result.success) {
+      setOptimisticMessages((current) => current.filter((message) => message.id !== messageId));
       setModalState(null);
       setDeleteError(null);
     } else {

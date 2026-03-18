@@ -302,7 +302,10 @@ export function MessageList({
                           }`}
                           onClick={
                             message.replyTo.isNavigable && message.replyTo.messageId
-                              ? () => onNavigateToReply?.(message.replyTo!.messageId!)
+                              ? (event) => {
+                                  event.stopPropagation();
+                                  onNavigateToReply?.(message.replyTo!.messageId!);
+                                }
                               : undefined
                           }
                           role={message.replyTo.isNavigable ? "button" : undefined}

@@ -174,6 +174,11 @@ export function LiveMessageList({
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cursorRef = useRef<MessageListCursor | null>(initialCursor);
+  const hasMoreRef = useRef(initialHasMore);
+  const loadingOlderRef = useRef(false);
+  const navigatingReplyTargetIdRef = useRef<string | null>(null);
+  const navigationSeqRef = useRef(0);
   const pendingScrollRestoreRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(
     null,
   );
@@ -188,7 +193,19 @@ export function LiveMessageList({
     }
   }, []);
 
-  const navigateToMessage = useCallback(
+  useEffect(() => {
+    cursorRef.current = cursor;
+  }, [cursor]);
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
+
+  useEffect(() => {
+    loadingOlderRef.current = loadingOlder;
+  }, [loadingOlder]);
+
+  const scrollToMessageAndHighlight = useCallback(
     (targetId: string) => {
       const target = messageElementByIdRef.current.get(targetId);
       const container = scrollContainerRef?.current ?? null;
@@ -222,6 +239,77 @@ export function LiveMessageList({
       }, HIGHLIGHT_DURATION_MS);
     },
     [scrollContainerRef],
+  );
+
+  const navigateToMessage = useCallback(
+    (targetId: string) => {
+      void (async () => {
+        const container = scrollContainerRef?.current ?? null;
+        if (!(container instanceof HTMLElement)) {
+          return;
+        }
+
+        const alreadyLoaded = messageElementByIdRef.current.has(targetId);
+        if (alreadyLoaded) {
+          scrollToMessageAndHighlight(targetId);
+          return;
+        }
+
+        // Игнорируем повторные клики по той же цели во время текущей догрузки.
+        if (loadingOlderRef.current && navigatingReplyTargetIdRef.current === targetId) {
+          return;
+        }
+
+        navigatingReplyTargetIdRef.current = targetId;
+        const mySeq = (navigationSeqRef.current += 1);
+
+        // Автодогрузка older pages до тех пор, пока target не появится в DOM,
+        // или пока история не исчерпается.
+        while (hasMoreRef.current) {
+          if (navigationSeqRef.current !== mySeq) {
+            return;
+          }
+
+          if (loadingOlderRef.current) {
+            return;
+          }
+
+          pendingScrollRestoreRef.current = {
+            prevScrollHeight: container.scrollHeight,
+            prevScrollTop: container.scrollTop,
+          };
+
+          setLoadingOlder(true);
+          const page = await loadOlderMessagesPageAction({ cursor: cursorRef.current });
+
+          if (navigationSeqRef.current !== mySeq) {
+            setLoadingOlder(false);
+            return;
+          }
+
+          setHistoryMessages((current) => mergeRenderedMessages(page.messages, current));
+          setCursor(page.nextCursor);
+          setHasMore(page.nextCursor !== null);
+          setLoadingOlder(false);
+
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+          if (messageElementByIdRef.current.has(targetId)) {
+            scrollToMessageAndHighlight(targetId);
+            if (navigationSeqRef.current === mySeq) {
+              navigatingReplyTargetIdRef.current = null;
+            }
+            return;
+          }
+        }
+
+        if (navigationSeqRef.current === mySeq) {
+          navigatingReplyTargetIdRef.current = null;
+        }
+      })();
+    },
+    [scrollContainerRef, scrollToMessageAndHighlight],
   );
 
   useLayoutEffect(() => {
