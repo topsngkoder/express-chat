@@ -36,6 +36,7 @@ type RealtimeMessageRow = {
 
 const NOTIFICATION_PREVIEW_LIMIT = 120;
 const NOTIFICATION_CLOSE_DELAY_MS = 5000;
+const HIGHLIGHT_DURATION_MS = 2000;
 
 function upsertRealtimeRenderedMessage(
   current: RenderedMessage[],
@@ -170,7 +171,9 @@ export function LiveMessageList({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [connectionLost, setConnectionLost] = useState(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingScrollRestoreRef = useRef<{ prevScrollHeight: number; prevScrollTop: number } | null>(
     null,
   );
@@ -184,6 +187,42 @@ export function LiveMessageList({
       map.delete(messageId);
     }
   }, []);
+
+  const navigateToMessage = useCallback(
+    (targetId: string) => {
+      const target = messageElementByIdRef.current.get(targetId);
+      const container = scrollContainerRef?.current ?? null;
+      if (!target || !(container instanceof HTMLElement)) {
+        return;
+      }
+
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+
+      const prefersReducedMotion =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const behavior = prefersReducedMotion ? ("auto" as const) : ("smooth" as const);
+
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const targetCenterY = targetRect.top + targetRect.height / 2;
+      const containerCenterY = containerRect.top + containerRect.height / 2;
+      const delta = targetCenterY - containerCenterY;
+      const desiredScrollTop = Math.max(0, container.scrollTop + delta);
+
+      container.scrollTo({ top: desiredScrollTop, behavior });
+      setHighlightedMessageId(targetId);
+
+      highlightTimeoutRef.current = setTimeout(() => {
+        highlightTimeoutRef.current = null;
+        setHighlightedMessageId(null);
+      }, HIGHLIGHT_DURATION_MS);
+    },
+    [scrollContainerRef],
+  );
 
   useLayoutEffect(() => {
     const pending = pendingScrollRestoreRef.current;
@@ -403,6 +442,14 @@ export function LiveMessageList({
     })();
   }, [cursor, hasMore, loadingOlder, scrollContainerRef]);
 
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="mt-4 space-y-4">
       {connectionLost ? (
@@ -418,10 +465,11 @@ export function LiveMessageList({
         messages={messages}
         onLoadOlder={handleLoadOlder}
         onReplyMessage={onReplyMessage}
-        onNavigateToReply={onNavigateToReply}
+        onNavigateToReply={navigateToMessage}
         onEditMessage={onEditMessage}
         onDeleteMessage={onDeleteMessage}
         registerMessageElement={registerMessageElement}
+        highlightedMessageId={highlightedMessageId}
       />
     </div>
   );

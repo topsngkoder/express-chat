@@ -15,6 +15,7 @@ type MessageListProps = {
   onEditMessage?: (messageId: string, initialText: string | null, hasImage: boolean) => void;
   onDeleteMessage?: (messageId: string) => void;
   registerMessageElement?: (messageId: string, node: HTMLElement | null) => void;
+  highlightedMessageId?: string | null;
 };
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ru-RU", {
@@ -150,6 +151,7 @@ export function MessageList({
   onEditMessage,
   onDeleteMessage,
   registerMessageElement,
+  highlightedMessageId,
 }: MessageListProps) {
   const [actionsExpandedMessageId, setActionsExpandedMessageId] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -265,7 +267,9 @@ export function MessageList({
                       data-group-start={meta.isGroupStart ? "true" : "false"}
                       data-group-end={meta.isGroupEnd ? "true" : "false"}
                       data-outgoing={meta.isOutgoing ? "true" : "false"}
-                      className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass}`}
+                      className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass} ${
+                        highlightedMessageId === message.id ? "ring-2 ring-[#4CC9F0] ring-offset-2 ring-offset-[#0F172A]" : ""
+                      }`}
                       tabIndex={canShowActions ? 0 : undefined}
                       role={canShowActions ? "group" : undefined}
                       aria-label={
