@@ -106,11 +106,11 @@
 
 ### F. Reply state в shell/composer
 
-- [ ] **F1**: Добавить shell-state активного ответа.
-- [ ] **F2**: Сделать reply и edit взаимоисключающими.
-- [ ] **F3**: Добавить reply panel над composer.
-- [ ] **F4**: Сохранять compose text при входе/выходе из reply mode.
-- [ ] **F5**: Сбрасывать reply panel после queueing сообщения и при ручной отмене.
+- [x] **F1**: Добавить shell-state активного ответа. (уже было: `activeReplyDraft` в `ChatShell`.)
+- [x] **F2**: Сделать reply и edit взаимоисключающими. (уже было: `handleRequestReply` очищает edit; `handleRequestEdit` очищает reply.)
+- [x] **F3**: Добавить reply panel над composer. (добавлено в `MessageComposer` + `onCancelReply` из `ChatShell`.)
+- [x] **F4**: Сохранять compose text при входе/выходе из reply mode. (текст хранится во внутреннем `useState` `MessageComposer`, компонент не remount'ится при смене `replyDraft`.)
+- [x] **F5**: Сбрасывать reply panel после queueing сообщения и при ручной отмене. (после submit: `ChatShell.handleSubmitMessage` очищает `activeReplyDraft`; ручная отмена: `onCancelReply`.)
 
 ### G. Reply block в bubble
 

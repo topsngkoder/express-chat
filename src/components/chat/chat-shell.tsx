@@ -534,6 +534,7 @@ export function ChatShell({
               <MessageComposer
                 key="compose"
                 replyDraft={activeReplyDraft}
+                onCancelReply={() => setActiveReplyDraft(null)}
                 onSubmitMessage={handleSubmitMessage}
               />
             )}
