@@ -124,6 +124,17 @@ function IconCross16() {
   );
 }
 
+function IconReply16() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path
+        d="M2 8c0-2.5 2-4 4-4h4l-2 2 1 1 3.5-3.5L9 0l-1 1v2H6C3 3 1 5 1 8v1h1V8z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function renderOutgoingDeliveryStatus(message: RenderedMessage) {
   if (message.deliveryStatus === "failed") {
     return (
@@ -426,37 +437,56 @@ export function MessageList({
                       </div>
                     ) : null}
 
-                    {canManageMessage && contextMenuMessageId === message.id ? (
+                    {canShowActions && contextMenuMessageId === message.id ? (
                       <div
                         ref={contextMenuRef}
                         role="menu"
                         className="absolute left-0 top-full z-10 mt-1 min-w-[180px] rounded-xl border border-[#22303D] bg-[#182533] py-1 shadow-lg"
                         aria-label="Действия с сообщением"
                       >
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#22303D] focus:bg-[#22303D] focus:outline-none"
-                          onClick={() => {
-                            onEditMessage?.(message.id, message.text ?? null, !!message.image);
-                            setContextMenuMessageId(null);
-                          }}
-                        >
-                          <IconPencil16 />
-                          Редактировать
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#8B2635] focus:bg-[#8B2635] focus:outline-none"
-                          onClick={() => {
-                            onDeleteMessage?.(message.id);
-                            setContextMenuMessageId(null);
-                          }}
-                        >
-                          <IconCross16 />
-                          Удалить
-                        </button>
+                        {canReplyMessage ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            aria-label="Ответить на сообщение"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#22303D] focus:bg-[#22303D] focus:outline-none"
+                            onClick={() => {
+                              onReplyMessage?.(message);
+                              setContextMenuMessageId(null);
+                            }}
+                          >
+                            <IconReply16 />
+                            Ответить
+                          </button>
+                        ) : null}
+                        {canManageMessage ? (
+                          <>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#22303D] focus:bg-[#22303D] focus:outline-none"
+                              onClick={() => {
+                                onEditMessage?.(message.id, message.text ?? null, !!message.image);
+                                setContextMenuMessageId(null);
+                              }}
+                            >
+                              <IconPencil16 />
+                              Редактировать
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#E6EEF7] outline-none hover:bg-[#8B2635] focus:bg-[#8B2635] focus:outline-none"
+                              onClick={() => {
+                                onDeleteMessage?.(message.id);
+                                setContextMenuMessageId(null);
+                              }}
+                            >
+                              <IconCross16 />
+                              Удалить
+                            </button>
+                          </>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>

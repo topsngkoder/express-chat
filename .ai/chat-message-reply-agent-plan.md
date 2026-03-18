@@ -96,9 +96,9 @@
 ### E. Reply action в message actions
 
 - [x] **E1**: Добавить `Ответить` в desktop actions.
-- [ ] **E2**: Добавить `Ответить` в touch context menu.
-- [ ] **E3**: Разрешить reply и для own, и для foreign confirmed messages.
-- [ ] **E4**: Запретить reply для optimistic/pending local messages.
+- [x] **E2**: Добавить `Ответить` в touch context menu.
+- [x] **E3**: Разрешить reply и для own, и для foreign confirmed messages.
+- [x] **E4**: Запретить reply для optimistic/pending local messages.
 
 ### F. Reply state в shell/composer
 
