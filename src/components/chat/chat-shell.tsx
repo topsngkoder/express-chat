@@ -31,6 +31,9 @@ const initialMessageComposerState = {
   error: null,
 } as const;
 
+const CUSTOM_SCROLLBAR_THUMB_HEIGHT = 56;
+const CUSTOM_SCROLLBAR_TRACK_INSET = 4;
+
 function buildClientMessageId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -66,6 +69,8 @@ export function ChatShell({
   const [unseenCount, setUnseenCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [scrollThumbTop, setScrollThumbTop] = useState(CUSTOM_SCROLLBAR_TRACK_INSET);
+  const [showScrollThumb, setShowScrollThumb] = useState(false);
 
   const [editDraft, setEditDraft] = useState<ChatEditDraft>(null);
   const [modalState, setModalState] = useState<ChatModalState>(null);
@@ -82,41 +87,6 @@ export function ChatShell({
   void latestInsertRef;
   void initialLoadedPages;
   void initialCursor;
-
-  useLayoutEffect(() => {
-    const scrollNode = scrollRef.current;
-    const composerNode = composerRef.current;
-
-    if (!scrollNode || !composerNode) {
-      return;
-    }
-
-    const applyPadding = () => {
-      const scrollRect = scrollNode.getBoundingClientRect();
-      const composerRect = composerNode.getBoundingClientRect();
-
-      // Если композер перекрывает scroll-область (overlay), добавляем ровно высоту перекрытия.
-      const overlap = Math.max(0, scrollRect.bottom - composerRect.top);
-      scrollNode.style.paddingBottom = overlap > 0 ? `${overlap}px` : "";
-    };
-
-    applyPadding();
-
-    const resizeObserver = new ResizeObserver(() => {
-      applyPadding();
-    });
-
-    resizeObserver.observe(composerNode);
-    resizeObserver.observe(scrollNode);
-
-    window.addEventListener("resize", applyPadding);
-
-    return () => {
-      window.removeEventListener("resize", applyPadding);
-      resizeObserver.disconnect();
-      scrollNode.style.paddingBottom = "";
-    };
-  }, []);
 
   useEffect(() => {
     const objectUrlByClientId = objectUrlByClientIdRef.current;
@@ -153,6 +123,64 @@ export function ChatShell({
     return distanceToBottom <= 120;
   }, []);
 
+  const updateScrollThumb = useCallback(() => {
+    const node = scrollRef.current;
+    if (!node) {
+      return;
+    }
+
+    const maxScrollTop = node.scrollHeight - node.clientHeight;
+    const shouldShowThumb = maxScrollTop > 1;
+    setShowScrollThumb(shouldShowThumb);
+
+    if (!shouldShowThumb) {
+      setScrollThumbTop(CUSTOM_SCROLLBAR_TRACK_INSET);
+      return;
+    }
+
+    const trackHeight = Math.max(node.clientHeight - CUSTOM_SCROLLBAR_TRACK_INSET * 2, 0);
+    const travelDistance = Math.max(trackHeight - CUSTOM_SCROLLBAR_THUMB_HEIGHT, 0);
+    const progress = maxScrollTop > 0 ? node.scrollTop / maxScrollTop : 0;
+
+    setScrollThumbTop(CUSTOM_SCROLLBAR_TRACK_INSET + travelDistance * progress);
+  }, []);
+
+  useLayoutEffect(() => {
+    const scrollNode = scrollRef.current;
+    const composerNode = composerRef.current;
+
+    if (!scrollNode || !composerNode) {
+      return;
+    }
+
+    const applyPadding = () => {
+      const scrollRect = scrollNode.getBoundingClientRect();
+      const composerRect = composerNode.getBoundingClientRect();
+
+      // Если композер перекрывает scroll-область (overlay), добавляем ровно высоту перекрытия.
+      const overlap = Math.max(0, scrollRect.bottom - composerRect.top);
+      scrollNode.style.paddingBottom = overlap > 0 ? `${overlap}px` : "";
+      updateScrollThumb();
+    };
+
+    applyPadding();
+
+    const resizeObserver = new ResizeObserver(() => {
+      applyPadding();
+    });
+
+    resizeObserver.observe(composerNode);
+    resizeObserver.observe(scrollNode);
+
+    window.addEventListener("resize", applyPadding);
+
+    return () => {
+      window.removeEventListener("resize", applyPadding);
+      resizeObserver.disconnect();
+      scrollNode.style.paddingBottom = "";
+    };
+  }, [updateScrollThumb]);
+
   const handleScroll = useCallback(() => {
     setIsScrolling(true);
     if (scrollActivityTimeoutRef.current) {
@@ -166,11 +194,12 @@ export function ChatShell({
     const nextIsAtBottom = computeIsAtBottom();
     isAtBottomRef.current = nextIsAtBottom;
     setIsAtBottom(nextIsAtBottom);
+    updateScrollThumb();
 
     if (nextIsAtBottom) {
       setUnseenCount(0);
     }
-  }, [computeIsAtBottom]);
+  }, [computeIsAtBottom, updateScrollThumb]);
 
   useEffect(() => {
     if (didInitialScrollRef.current) {
@@ -192,9 +221,14 @@ export function ChatShell({
   }, [scrollToBottom]);
 
   useEffect(() => {
-    // Инициализация состояния “у низа” после первого layout.
-    requestAnimationFrame(handleScroll);
-  }, [handleScroll]);
+    // Инициализация состояния “у низа” после первого layout без анимации активного скролла.
+    requestAnimationFrame(() => {
+      const nextIsAtBottom = computeIsAtBottom();
+      isAtBottomRef.current = nextIsAtBottom;
+      setIsAtBottom(nextIsAtBottom);
+      updateScrollThumb();
+    });
+  }, [computeIsAtBottom, updateScrollThumb]);
 
   const handleRealtimeInsert = useCallback(
     (message: RenderedMessage) => {
@@ -404,41 +438,57 @@ export function ChatShell({
           </Link>
         </header>
 
-        <section
-          ref={scrollRef}
-          data-scrolling={isScrolling ? "true" : "false"}
-          className="chat-scrollbar relative min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
-          onScroll={handleScroll}
-        >
-          <LiveMessageList
-            currentUserId={currentUserId}
-            initialCursor={initialCursor}
-            initialHasMore={initialHasMore}
-            initialMessages={initialMessages}
-            optimisticMessages={optimisticMessages}
-            scrollContainerRef={scrollRef}
-            onRealtimeInsert={handleRealtimeInsert}
-            onEditMessage={handleRequestEdit}
-            onDeleteMessage={handleRequestDelete}
-          />
+        <div className="relative min-h-0 flex-1">
+          <section
+            ref={scrollRef}
+            data-scrolling={isScrolling ? "true" : "false"}
+            className="chat-scrollbar min-h-0 h-full overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+            onScroll={handleScroll}
+          >
+            <LiveMessageList
+              currentUserId={currentUserId}
+              initialCursor={initialCursor}
+              initialHasMore={initialHasMore}
+              initialMessages={initialMessages}
+              optimisticMessages={optimisticMessages}
+              scrollContainerRef={scrollRef}
+              onRealtimeInsert={handleRealtimeInsert}
+              onEditMessage={handleRequestEdit}
+              onDeleteMessage={handleRequestDelete}
+            />
 
-          {unseenCount > 0 && !isAtBottom ? (
-            <div className="pointer-events-none sticky bottom-3 left-0 right-0 flex justify-center">
-              <button
-                aria-label="Прокрутить к новым сообщениям"
-                className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-[#2B5278] px-4 py-2 text-sm font-semibold text-[#E6EEF7] shadow-lg shadow-black/20 transition hover:bg-[#336192] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-                type="button"
-                onClick={() => {
-                  scrollToBottom();
-                  setUnseenCount(0);
+            {unseenCount > 0 && !isAtBottom ? (
+              <div className="pointer-events-none sticky bottom-3 left-0 right-0 flex justify-center">
+                <button
+                  aria-label="Прокрутить к новым сообщениям"
+                  className="pointer-events-auto inline-flex items-center gap-2 rounded-full bg-[#2B5278] px-4 py-2 text-sm font-semibold text-[#E6EEF7] shadow-lg shadow-black/20 transition hover:bg-[#336192] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                  type="button"
+                  onClick={() => {
+                    scrollToBottom();
+                    setUnseenCount(0);
+                  }}
+                >
+                  <span aria-hidden="true">↓</span>
+                  <span>{unseenCount} новых</span>
+                </button>
+              </div>
+            ) : null}
+          </section>
+
+          {showScrollThumb ? (
+            <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-[3px] top-0 w-[6px]">
+              <div
+                className={`absolute left-0 right-0 rounded-full bg-[rgba(111,138,164,0.68)] transition-opacity duration-200 ${
+                  isScrolling ? "opacity-100" : "opacity-0"
+                }`}
+                style={{
+                  height: `${CUSTOM_SCROLLBAR_THUMB_HEIGHT}px`,
+                  top: `${scrollThumbTop}px`,
                 }}
-              >
-                <span aria-hidden="true">↓</span>
-                <span>{unseenCount} новых</span>
-              </button>
+              />
             </div>
           ) : null}
-        </section>
+        </div>
 
         <footer
           ref={composerRef}
