@@ -11,6 +11,7 @@ type MessageListProps = {
   hasMore: boolean;
   loadingOlder?: boolean;
   onLoadOlder?: () => void;
+  onReplyMessage?: (message: RenderedMessage) => void;
   onEditMessage?: (messageId: string, initialText: string | null, hasImage: boolean) => void;
   onDeleteMessage?: (messageId: string) => void;
 };
@@ -153,6 +154,7 @@ export function MessageList({
   hasMore,
   loadingOlder,
   onLoadOlder,
+  onReplyMessage,
   onEditMessage,
   onDeleteMessage,
 }: MessageListProps) {
@@ -229,6 +231,9 @@ export function MessageList({
           const alignmentClass = meta.isOutgoing ? "justify-end" : "justify-start";
           const bubbleColor = meta.isOutgoing ? "bg-[#2B5278]" : "bg-[#182533]";
           const canManageMessage = meta.isOutgoing && (!message.isOptimistic || message.deliveryStatus === "sent");
+          const canReplyMessage =
+            (!message.isOptimistic || message.deliveryStatus === "sent") && Boolean(onReplyMessage);
+          const canShowActions = canReplyMessage || canManageMessage;
           const shouldShowTail = meta.isGroupEnd;
           const tailClass = shouldShowTail
             ? meta.isOutgoing
@@ -281,20 +286,20 @@ export function MessageList({
                       data-group-end={meta.isGroupEnd ? "true" : "false"}
                       data-outgoing={meta.isOutgoing ? "true" : "false"}
                       className={`relative max-w-[78vw] rounded-2xl ${bubbleColor} ${bubblePaddingClass} text-[#E6EEF7] sm:max-w-[62vw] ${tailClass}`}
-                      tabIndex={canManageMessage ? 0 : undefined}
-                      role={canManageMessage ? "group" : undefined}
+                      tabIndex={canShowActions ? 0 : undefined}
+                      role={canShowActions ? "group" : undefined}
                       aria-label={
                         meta.isOutgoing
                           ? `Сообщение, ${formatMessageTime(message.createdAt)}`
                           : undefined
                       }
                       onClick={
-                        canManageMessage && isDesktop
+                        canShowActions && isDesktop
                           ? () => setActionsExpandedMessageId((id) => (id === message.id ? null : message.id))
                           : undefined
                       }
                       onPointerDown={
-                        canManageMessage
+                        canShowActions
                           ? (e) => {
                               if (e.button !== 0) return;
                               clearLongPressTimer();
@@ -311,7 +316,7 @@ export function MessageList({
                           : undefined
                       }
                       onPointerUp={
-                        canManageMessage
+                        canShowActions
                           ? (e) => {
                               if (e.pointerId !== longPressPointerIdRef.current) return;
                               clearLongPressTimer();
@@ -324,14 +329,14 @@ export function MessageList({
                           : undefined
                       }
                       onPointerMove={
-                        canManageMessage
+                        canShowActions
                           ? (e) => {
                               if (e.pointerId === longPressPointerIdRef.current) clearLongPressTimer();
                             }
                           : undefined
                       }
                       onPointerCancel={
-                        canManageMessage
+                        canShowActions
                           ? (e) => {
                               if (e.pointerId === longPressPointerIdRef.current) clearLongPressTimer();
                             }
@@ -380,7 +385,7 @@ export function MessageList({
                       </div>
                     </article>
 
-                    {canManageMessage ? (
+                    {canShowActions ? (
                       <div
                         className={
                           isDesktop
@@ -388,22 +393,36 @@ export function MessageList({
                             : "pointer-events-none absolute bottom-full right-0 z-[100] mb-1 flex items-center gap-0.5 rounded-lg border border-[#22303D] bg-[#182533] p-1 opacity-0 shadow-xl transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
                         }
                       >
-                        <button
-                          type="button"
-                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none transition-colors hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
-                          aria-label="Редактировать сообщение"
-                          onClick={() => onEditMessage?.(message.id, message.text ?? null, !!message.image)}
-                        >
-                          <IconPencil16 />
-                        </button>
-                        <button
-                          type="button"
-                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none transition-colors hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
-                          aria-label="Удалить сообщение"
-                          onClick={() => onDeleteMessage?.(message.id)}
-                        >
-                          <IconCross16 />
-                        </button>
+                        {canReplyMessage ? (
+                          <button
+                            type="button"
+                            className="flex h-8 flex-shrink-0 items-center justify-center rounded px-2 text-sm text-[#B7C9DA] outline-none transition-colors hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                            aria-label="Ответить на сообщение"
+                            onClick={() => onReplyMessage?.(message)}
+                          >
+                            Ответить
+                          </button>
+                        ) : null}
+                        {canManageMessage ? (
+                          <>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none transition-colors hover:bg-[#3a6288] hover:text-[#E6EEF7] focus:bg-[#3a6288] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                              aria-label="Редактировать сообщение"
+                              onClick={() => onEditMessage?.(message.id, message.text ?? null, !!message.image)}
+                            >
+                              <IconPencil16 />
+                            </button>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-[#B7C9DA] outline-none transition-colors hover:bg-[#8B2635] hover:text-[#E6EEF7] focus:bg-[#8B2635] focus:text-[#E6EEF7] focus:outline-none focus:ring-2 focus:ring-[#4CC9F0] focus:ring-offset-2 focus:ring-offset-[#182533]"
+                              aria-label="Удалить сообщение"
+                              onClick={() => onDeleteMessage?.(message.id)}
+                            >
+                              <IconCross16 />
+                            </button>
+                          </>
+                        ) : null}
                       </div>
                     ) : null}
 

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { createMessageFormAction, deleteMessageAction, editMessageAction } from "@/lib/actions/messages";
 import type { MessageListCursor } from "@/lib/messages/list-messages";
+import { buildReplySnapshotFromMessage } from "@/lib/messages/message-reply";
 import {
   mergeRenderedMessages,
   type MessageReplyTo,
@@ -277,8 +278,14 @@ export function ChatShell({
     }
   }, []);
 
+  const handleRequestReply = useCallback((message: RenderedMessage) => {
+    setEditDraft(null);
+    setActiveReplyDraft(buildReplySnapshotFromMessage(message));
+  }, []);
+
   const handleRequestEdit = useCallback(
     (messageId: string, initialText: string | null, hasImage: boolean) => {
+      setActiveReplyDraft(null);
       setEditDraft({ messageId, initialText, editingMessageHasImage: hasImage });
     },
     [],
@@ -471,6 +478,7 @@ export function ChatShell({
               scrollContainerRef={scrollRef}
               onRealtimeInsert={handleRealtimeInsert}
               onEditMessage={handleRequestEdit}
+              onReplyMessage={handleRequestReply}
               onDeleteMessage={handleRequestDelete}
             />
 
