@@ -347,12 +347,8 @@ export function MessageList({
                           : undefined
                       }
                     >
-                      {message.text ? (
-                        <p className="whitespace-pre-wrap break-words text-sm leading-5">{message.text}</p>
-                      ) : null}
-
                       {message.image ? (
-                        <div className={message.text ? "mt-2 overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
+                        <div className={message.text ? "overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
                           <img
                             alt={message.image.alt}
                             className="block max-h-[320px] w-full rounded-xl object-contain sm:max-h-[420px]"
@@ -360,6 +356,12 @@ export function MessageList({
                             src={message.image.url}
                           />
                         </div>
+                      ) : null}
+
+                      {message.text ? (
+                        <p className={`whitespace-pre-wrap break-words text-sm leading-5 ${message.image ? "mt-2" : ""}`}>
+                          {message.text}
+                        </p>
                       ) : null}
 
                       <div
