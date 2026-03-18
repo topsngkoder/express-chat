@@ -20,6 +20,11 @@ type MessageRow = {
   image_height: number | null;
   created_at: string;
   updated_at: string | null;
+  reply_to_message_id: string | null;
+  reply_to_sender_id: string | null;
+  reply_to_sender_name: string | null;
+  reply_to_preview_text: string | null;
+  reply_to_has_image: boolean | null;
 };
 
 export type MessageListItem = {
@@ -35,6 +40,11 @@ export type MessageListItem = {
   imageHeight: number | null;
   createdAt: string;
   updatedAt: string | null;
+  replyToMessageId: string | null;
+  replyToSenderId: string | null;
+  replyToSenderName: string | null;
+  replyToPreviewText: string | null;
+  replyToHasImage: boolean | null;
 };
 
 export type MessageListCursor = {
@@ -66,6 +76,11 @@ function mapMessageRow(row: MessageRow): MessageListItem {
     imageHeight: row.image_height,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    replyToMessageId: row.reply_to_message_id ?? null,
+    replyToSenderId: row.reply_to_sender_id ?? null,
+    replyToSenderName: row.reply_to_sender_name ?? null,
+    replyToPreviewText: row.reply_to_preview_text ?? null,
+    replyToHasImage: row.reply_to_has_image ?? false,
   };
 }
 
@@ -86,7 +101,7 @@ export async function listMessagesPage(cursor?: MessageListCursor | null): Promi
     let query = supabase
       .from("messages")
       .select(
-        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at,updated_at",
+        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at,updated_at,reply_to_message_id,reply_to_sender_id,reply_to_sender_name,reply_to_preview_text,reply_to_has_image",
       )
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
@@ -132,7 +147,7 @@ export async function listMessagesAfterCursor(
     const { data, error } = await supabase
       .from("messages")
       .select(
-        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at,updated_at",
+        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at,updated_at,reply_to_message_id,reply_to_sender_id,reply_to_sender_name,reply_to_preview_text,reply_to_has_image",
       )
       .or(buildNewerThanFilter(cursor))
       .order("created_at", { ascending: true })

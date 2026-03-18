@@ -68,6 +68,11 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       imagePath: item.imagePath,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
+      replyToMessageId: item.replyToMessageId,
+      replyToSenderId: item.replyToSenderId,
+      replyToSenderName: item.replyToSenderName,
+      replyToPreviewText: item.replyToPreviewText,
+      replyToHasImage: item.replyToHasImage,
     })),
   );
 

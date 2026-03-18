@@ -11,6 +11,7 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
+import type { MessageReplyTo } from "@/lib/messages/rendered-message";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   clientImagePrecheck,
@@ -32,11 +33,15 @@ export type MessageComposerComposeProps = {
   mode?: "compose";
   onFeedbackChange?: (feedback: ComposerFeedback) => void;
   onSubmitMessage?: (input: MessageComposerSubmitInput) => void | Promise<void>;
+  /** Активный ответ на сообщение; передаётся в submit и в reply panel. */
+  replyDraft?: MessageReplyTo | null;
 };
 
 export type MessageComposerSubmitInput = {
   text: string | null;
   imageFile: File | null;
+  /** Snapshot ответа на сообщение для optimistic UI и formData. */
+  replyDraft?: MessageReplyTo | null;
 };
 
 type SelectedImage = {
@@ -264,6 +269,7 @@ export function MessageComposer(props: MessageComposerProps) {
       await composeProps.onSubmitMessage({
         text: trimmedText.length > 0 ? trimmedText : null,
         imageFile: selectedImage?.file ?? null,
+        replyDraft: composeProps.replyDraft ?? null,
       });
 
       setText("");

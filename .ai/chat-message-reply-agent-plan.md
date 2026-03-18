@@ -70,21 +70,21 @@
 
 ### A. Модель данных и миграция
 
-- [ ] **A1**: Добавить reply-поля в таблицу `messages`.
-- [ ] **A2**: Настроить self-reference `reply_to_message_id -> messages.id` с `ON DELETE SET NULL`.
-- [ ] **A3**: Обновить комментарии/ограничения схемы так, чтобы snapshot-поля reply не терялись при удалении исходного сообщения.
+- [x] **A1**: Добавить reply-поля в таблицу `messages`.
+- [x] **A2**: Настроить self-reference `reply_to_message_id -> messages.id` с `ON DELETE SET NULL`.
+- [x] **A3**: Обновить комментарии/ограничения схемы так, чтобы snapshot-поля reply не терялись при удалении исходного сообщения.
 
 ### B. Типы и серверный контракт
 
-- [ ] **B1**: Добавить `replyTo` в `RenderedMessage`.
-- [ ] **B2**: Добавить reply-поля в server row mapping и pagination queries.
-- [ ] **B3**: Вынести единые helper'ы для preview/snapshot reply.
+- [x] **B1**: Добавить `replyTo` в `RenderedMessage`.
+- [x] **B2**: Добавить reply-поля в server row mapping и pagination queries.
+- [x] **B3**: Вынести единые helper'ы для preview/snapshot reply.
 
 ### C. Создание сообщения-ответа
 
-- [ ] **C1**: Расширить `createMessageFormAction` приемом reply payload из composer.
-- [ ] **C2**: Расширить `createMessage()` серверной нормализацией reply.
-- [ ] **C3**: Гарантировать, что optimistic-сообщение получает `replyTo` сразу при постановке в очередь.
+- [x] **C1**: Расширить `createMessageFormAction` приемом reply payload из composer.
+- [x] **C2**: Расширить `createMessage()` серверной нормализацией reply.
+- [x] **C3**: Гарантировать, что optimistic-сообщение получает `replyTo` сразу при постановке в очередь.
 
 ### D. Realtime / SSR / pagination consistency
 

@@ -5,7 +5,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { createMessageFormAction, deleteMessageAction, editMessageAction } from "@/lib/actions/messages";
 import type { MessageListCursor } from "@/lib/messages/list-messages";
-import { mergeRenderedMessages, type RenderedMessage } from "@/lib/messages/rendered-message";
+import {
+  mergeRenderedMessages,
+  type MessageReplyTo,
+  type RenderedMessage,
+} from "@/lib/messages/rendered-message";
 
 import { ConfirmDeleteDialog } from "./confirm-delete-dialog";
 import { LiveMessageList } from "./live-message-list";
@@ -73,6 +77,7 @@ export function ChatShell({
   const [showScrollThumb, setShowScrollThumb] = useState(false);
 
   const [editDraft, setEditDraft] = useState<ChatEditDraft>(null);
+  const [activeReplyDraft, setActiveReplyDraft] = useState<MessageReplyTo | null>(null);
   const [modalState, setModalState] = useState<ChatModalState>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -292,7 +297,7 @@ export function ChatShell({
   }, []);
 
   const handleSubmitMessage = useCallback(
-    ({ text, imageFile }: MessageComposerSubmitInput) => {
+    ({ text, imageFile, replyDraft }: MessageComposerSubmitInput) => {
       const clientId = buildClientMessageId();
       const localId = `local:${clientId}`;
       const createdAt = new Date().toISOString();
@@ -320,9 +325,14 @@ export function ChatShell({
               alt: text?.slice(0, 80) || `Изображение от ${userDisplayName}`,
             }
           : null,
+        ...(replyDraft && { replyTo: replyDraft }),
       };
 
       setOptimisticMessages((current) => mergeRenderedMessages(current, [optimisticMessage]));
+
+      if (replyDraft) {
+        setActiveReplyDraft(null);
+      }
 
       if (isAtBottomRef.current) {
         requestAnimationFrame(scrollToBottom);
@@ -337,6 +347,14 @@ export function ChatShell({
 
             if (imageFile) {
               formData.set("image", imageFile);
+            }
+
+            if (replyDraft) {
+              formData.set("replyToMessageId", replyDraft.messageId ?? "");
+              formData.set("replyToSenderId", replyDraft.senderId);
+              formData.set("replyToSenderName", replyDraft.senderName);
+              formData.set("replyToPreviewText", replyDraft.previewText);
+              formData.set("replyToHasImage", String(replyDraft.hasImage));
             }
 
             const result = await createMessageFormAction(initialMessageComposerState, formData);
@@ -505,7 +523,11 @@ export function ChatShell({
                 onCancelEdit={handleCancelEdit}
               />
             ) : (
-              <MessageComposer key="compose" onSubmitMessage={handleSubmitMessage} />
+              <MessageComposer
+                key="compose"
+                replyDraft={activeReplyDraft}
+                onSubmitMessage={handleSubmitMessage}
+              />
             )}
           </div>
         </footer>

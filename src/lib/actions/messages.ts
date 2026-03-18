@@ -49,17 +49,62 @@ function getOptionalImageFile(formData: FormData): File | null {
   return image;
 }
 
+/** Reply payload из формы (опционально). */
+type ReplyFormPayload = {
+  replyToMessageId: string | null;
+  replyToSenderId: string | null;
+  replyToSenderName: string | null;
+  replyToPreviewText: string | null;
+  replyToHasImage: boolean;
+};
+
+function getOptionalReplyPayload(formData: FormData): ReplyFormPayload | null {
+  const messageId = formData.get("replyToMessageId");
+  const senderId = formData.get("replyToSenderId");
+  const senderName = formData.get("replyToSenderName");
+  const previewText = formData.get("replyToPreviewText");
+  const hasImageRaw = formData.get("replyToHasImage");
+
+  const hasAny =
+    (typeof messageId === "string" && messageId.trim().length > 0) ||
+    (typeof senderId === "string" && senderId.trim().length > 0) ||
+    (typeof senderName === "string" && senderName.trim().length > 0) ||
+    (typeof previewText === "string") ||
+    hasImageRaw !== null;
+
+  if (!hasAny) return null;
+
+  const replyToHasImage =
+    hasImageRaw === "true" || hasImageRaw === "1" || (typeof hasImageRaw === "string" && hasImageRaw.toLowerCase() === "true");
+
+  return {
+    replyToMessageId: typeof messageId === "string" ? messageId.trim() || null : null,
+    replyToSenderId: typeof senderId === "string" ? senderId.trim() || null : null,
+    replyToSenderName: typeof senderName === "string" ? senderName.trim() || null : null,
+    replyToPreviewText: typeof previewText === "string" ? previewText : null,
+    replyToHasImage,
+  };
+}
+
 export async function createMessageFormAction(
   _previousState: MessageComposerState,
   formData: FormData,
 ): Promise<CreateMessageFormActionResult> {
   const text = (formData.get("text") ?? "") as string;
   const imageFile = getOptionalImageFile(formData);
+  const replyPayload = getOptionalReplyPayload(formData);
 
   try {
     const createdMessage = await createMessage({
       text,
       imageFile,
+      ...(replyPayload && {
+        replyToMessageId: replyPayload.replyToMessageId,
+        replyToSenderId: replyPayload.replyToSenderId,
+        replyToSenderName: replyPayload.replyToSenderName,
+        replyToPreviewText: replyPayload.replyToPreviewText,
+        replyToHasImage: replyPayload.replyToHasImage,
+      }),
     });
     const senderName = toSenderName(createdMessage.senderDisplayName, createdMessage.senderEmail);
     const renderedMessage = await renderMessageForChat({
@@ -70,6 +115,11 @@ export async function createMessageFormAction(
       imagePath: createdMessage.imagePath,
       createdAt: createdMessage.createdAt,
       updatedAt: null,
+      replyToMessageId: createdMessage.replyToMessageId,
+      replyToSenderId: createdMessage.replyToSenderId,
+      replyToSenderName: createdMessage.replyToSenderName,
+      replyToPreviewText: createdMessage.replyToPreviewText,
+      replyToHasImage: createdMessage.replyToHasImage,
     });
 
     revalidatePath("/chat");
@@ -185,6 +235,11 @@ export async function backfillMessagesAfterCursorAction(
         imagePath: message.imagePath,
         createdAt: message.createdAt,
         updatedAt: message.updatedAt,
+        replyToMessageId: message.replyToMessageId,
+        replyToSenderId: message.replyToSenderId,
+        replyToSenderName: message.replyToSenderName,
+        replyToPreviewText: message.replyToPreviewText,
+        replyToHasImage: message.replyToHasImage,
       })),
     );
   } catch {
@@ -233,6 +288,11 @@ export async function loadOlderMessagesPageAction(input: LoadOlderMessagesPageIn
         imagePath: item.imagePath,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
+        replyToMessageId: item.replyToMessageId,
+        replyToSenderId: item.replyToSenderId,
+        replyToSenderName: item.replyToSenderName,
+        replyToPreviewText: item.replyToPreviewText,
+        replyToHasImage: item.replyToHasImage,
       })),
     );
 

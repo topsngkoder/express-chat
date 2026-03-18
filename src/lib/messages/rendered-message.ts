@@ -1,5 +1,18 @@
 export type MessageDeliveryStatus = "pending" | "sent" | "failed";
 
+/** Данные цитаты/ответа на сообщение (превью в bubble и в reply panel). */
+export type MessageReplyTo = {
+  /** id исходного сообщения; null после удаления original. */
+  messageId: string | null;
+  senderId: string;
+  senderName: string;
+  /** Текст превью (до 80 символов + «…» или «Фото»/«Сообщение»). */
+  previewText: string;
+  hasImage: boolean;
+  /** true только если messageId не null и сообщение доступно для перехода. */
+  isNavigable: boolean;
+};
+
 export type RenderedMessage = {
   id: string;
   senderId: string;
@@ -16,6 +29,8 @@ export type RenderedMessage = {
     url: string;
     alt: string;
   } | null;
+  /** Данные ответа на сообщение; null если сообщение не является ответом. */
+  replyTo?: MessageReplyTo | null;
 };
 
 export function compareRenderedMessages(left: RenderedMessage, right: RenderedMessage): number {

@@ -3,6 +3,7 @@ import "server-only";
 import { getAvatarSignedUrl } from "@/lib/profile/profile-service";
 import { getMessageImageSignedUrl } from "@/lib/messages/get-message-image-signed-url";
 import type { RenderedMessage } from "@/lib/messages/rendered-message";
+import { buildReplyToFromRow } from "@/lib/messages/message-reply";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RenderMessageInput = {
@@ -14,6 +15,11 @@ type RenderMessageInput = {
   imagePath: string | null;
   createdAt: string;
   updatedAt?: string | null;
+  replyToMessageId?: string | null;
+  replyToSenderId?: string | null;
+  replyToSenderName?: string | null;
+  replyToPreviewText?: string | null;
+  replyToHasImage?: boolean | null;
 };
 
 type ProfileAvatarRow = {
@@ -88,6 +94,13 @@ export async function renderMessageForChat(message: RenderMessageInput): Promise
     message.senderAvatarUrl !== undefined
       ? message.senderAvatarUrl
       : await bestEffortGetSenderAvatarUrl(message.senderId);
+  const replyTo = buildReplyToFromRow({
+    replyToMessageId: message.replyToMessageId,
+    replyToSenderId: message.replyToSenderId,
+    replyToSenderName: message.replyToSenderName,
+    replyToPreviewText: message.replyToPreviewText,
+    replyToHasImage: message.replyToHasImage,
+  });
 
   return {
     id: message.id,
@@ -103,6 +116,7 @@ export async function renderMessageForChat(message: RenderMessageInput): Promise
           alt: message.text?.slice(0, 80) || `Изображение от ${message.senderName}`,
         }
       : null,
+    ...(replyTo && { replyTo }),
   };
 }
 

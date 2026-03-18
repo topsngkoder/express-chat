@@ -10,6 +10,7 @@ import { parseMessageDraft } from "@/lib/validation/message";
 
 import { getOrCreateCurrentProfile } from "@/lib/profile/profile-service";
 import { uploadChatImage } from "./upload-chat-image";
+import { buildPreviewText } from "./reply-preview";
 
 const MESSAGE_RATE_LIMIT_WINDOW_MS = 60_000;
 const MESSAGE_RATE_LIMIT_MAX = 20;
@@ -30,6 +31,21 @@ type MessageRow = {
   image_width: number | null;
   image_height: number | null;
   created_at: string;
+  reply_to_message_id: string | null;
+  reply_to_sender_id: string | null;
+  reply_to_sender_name: string | null;
+  reply_to_preview_text: string | null;
+  reply_to_has_image: boolean | null;
+};
+
+/** Строка исходного сообщения для нормализации reply snapshot. */
+type SourceMessageRow = {
+  id: string;
+  sender_id: string;
+  sender_display_name: string | null;
+  sender_email: string;
+  text: string | null;
+  image_path: string | null;
 };
 
 export type CreatedMessage = {
@@ -44,11 +60,22 @@ export type CreatedMessage = {
   imageWidth: number | null;
   imageHeight: number | null;
   createdAt: string;
+  replyToMessageId: string | null;
+  replyToSenderId: string | null;
+  replyToSenderName: string | null;
+  replyToPreviewText: string | null;
+  replyToHasImage: boolean | null;
 };
 
 export type CreateMessageInput = {
   text?: string | null;
   imageFile?: File | null;
+  /** Reply payload из composer (C2 реализует запись в БД). */
+  replyToMessageId?: string | null;
+  replyToSenderId?: string | null;
+  replyToSenderName?: string | null;
+  replyToPreviewText?: string | null;
+  replyToHasImage?: boolean;
 };
 
 function mapMessageRow(row: MessageRow): CreatedMessage {
@@ -64,6 +91,84 @@ function mapMessageRow(row: MessageRow): CreatedMessage {
     imageWidth: row.image_width,
     imageHeight: row.image_height,
     createdAt: row.created_at,
+    replyToMessageId: row.reply_to_message_id ?? null,
+    replyToSenderId: row.reply_to_sender_id ?? null,
+    replyToSenderName: row.reply_to_sender_name ?? null,
+    replyToPreviewText: row.reply_to_preview_text ?? null,
+    replyToHasImage: row.reply_to_has_image ?? false,
+  };
+}
+
+type ReplyInsertPayload = {
+  reply_to_message_id: string | null;
+  reply_to_sender_id: string | null;
+  reply_to_sender_name: string | null;
+  reply_to_preview_text: string | null;
+  reply_to_has_image: boolean | null;
+};
+
+async function fetchSourceMessage(
+  messageId: string,
+): Promise<SourceMessageRow | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id,sender_id,sender_display_name,sender_email,text,image_path")
+    .eq("id", messageId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as SourceMessageRow;
+}
+
+function toSourceSenderName(row: SourceMessageRow): string {
+  const name =
+    row.sender_display_name?.trim() && row.sender_display_name.trim().length > 0
+      ? row.sender_display_name.trim()
+      : row.sender_email;
+  return name;
+}
+
+async function computeReplyInsertPayload(input: CreateMessageInput): Promise<ReplyInsertPayload> {
+  const hasClientReply =
+    (input.replyToMessageId?.trim()?.length ?? 0) > 0 ||
+    (input.replyToSenderId?.trim()?.length ?? 0) > 0 ||
+    (input.replyToSenderName?.trim()?.length ?? 0) > 0;
+
+  if (!hasClientReply) {
+    return {
+      reply_to_message_id: null,
+      reply_to_sender_id: null,
+      reply_to_sender_name: null,
+      reply_to_preview_text: null,
+      reply_to_has_image: null,
+    };
+  }
+
+  const replyToMessageId = input.replyToMessageId?.trim() || null;
+
+  if (replyToMessageId) {
+    const source = await fetchSourceMessage(replyToMessageId);
+    if (source) {
+      const senderName = toSourceSenderName(source);
+      const hasImage = source.image_path != null;
+      const previewText = buildPreviewText(source.text, hasImage);
+      return {
+        reply_to_message_id: source.id,
+        reply_to_sender_id: source.sender_id,
+        reply_to_sender_name: senderName,
+        reply_to_preview_text: previewText,
+        reply_to_has_image: hasImage,
+      };
+    }
+  }
+
+  return {
+    reply_to_message_id: null,
+    reply_to_sender_id: input.replyToSenderId?.trim() || null,
+    reply_to_sender_name: input.replyToSenderName?.trim() || null,
+    reply_to_preview_text: input.replyToPreviewText ?? null,
+    reply_to_has_image: input.replyToHasImage ?? false,
   };
 }
 
@@ -200,6 +305,8 @@ export async function createMessage(input: CreateMessageInput): Promise<CreatedM
         ? profile.displayName.trim()
         : user.email;
 
+    const replyPayload = await computeReplyInsertPayload(input);
+
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
       .from("messages")
@@ -213,9 +320,10 @@ export async function createMessage(input: CreateMessageInput): Promise<CreatedM
         image_size_bytes: draft.image?.sizeBytes ?? null,
         image_width: draft.image?.width ?? null,
         image_height: draft.image?.height ?? null,
+        ...replyPayload,
       })
       .select(
-        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at",
+        "id,sender_id,sender_email,sender_display_name,text,image_path,image_mime_type,image_size_bytes,image_width,image_height,created_at,reply_to_message_id,reply_to_sender_id,reply_to_sender_name,reply_to_preview_text,reply_to_has_image",
       )
       .single();
 
