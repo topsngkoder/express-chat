@@ -442,7 +442,7 @@ export function ChatShell({
           <section
             ref={scrollRef}
             data-scrolling={isScrolling ? "true" : "false"}
-            className="chat-scrollbar min-h-0 h-full overflow-y-auto px-3 pt-3 pb-6 sm:px-4 sm:py-4"
+            className="chat-scrollbar min-h-0 h-full overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
             onScroll={handleScroll}
           >
             <LiveMessageList
