@@ -154,12 +154,9 @@ export function ChatShell({
     }
 
     const applyPadding = () => {
-      const scrollRect = scrollNode.getBoundingClientRect();
       const composerRect = composerNode.getBoundingClientRect();
-
-      // Если композер перекрывает scroll-область (overlay), добавляем ровно высоту перекрытия.
-      const overlap = Math.max(0, scrollRect.bottom - composerRect.top);
-      scrollNode.style.paddingBottom = overlap > 0 ? `${overlap}px` : "";
+      // Шапка и полоса ввода фиксированы — скролл уходит под них. Отступ снизу = высота композера.
+      scrollNode.style.paddingBottom = `${composerRect.height}px`;
       updateScrollThumb();
     };
 
@@ -404,45 +401,47 @@ export function ChatShell({
 
   return (
     <main className="dark h-dvh overflow-hidden bg-[#0E1621] text-[#E6EEF7]">
-      <div className="mx-auto flex h-full w-full max-w-[960px] flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#22303D] bg-[#17212B] px-3 sm:px-4">
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold leading-tight sm:text-3xl">Экспресс-чат</h1>
-          </div>
+      <div className="relative mx-auto h-full w-full max-w-[960px]">
+        <header className="fixed left-0 right-0 top-0 z-20 border-b border-[#22303D] bg-[#17212B]">
+          <div className="mx-auto flex h-14 w-full max-w-[960px] items-center justify-between px-3 sm:px-4">
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-semibold leading-tight sm:text-3xl">Экспресс-чат</h1>
+            </div>
 
-          <Link
-            aria-label="Настройки"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#607382] transition hover:bg-white/5 hover:text-[#E6EEF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-            href="/settings"
-          >
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="20"
-              viewBox="0 0 24 24"
-              width="20"
-              xmlns="http://www.w3.org/2000/svg"
+            <Link
+              aria-label="Настройки"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#607382] transition hover:bg-white/5 hover:text-[#E6EEF7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              href="/settings"
             >
-              <path
-                d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M19.4 15a8.2 8.2 0 0 0 .1-1 8.2 8.2 0 0 0-.1-1l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.8 7.8 0 0 0-1.7-1l-.4-2.5a.5.5 0 0 0-.5-.4H10a.5.5 0 0 0-.5.4l-.4 2.5a7.8 7.8 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.5 10a.5.5 0 0 0 .1.6l2 1.6a8.2 8.2 0 0 0-.1 1 8.2 8.2 0 0 0 .1 1l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1a7.8 7.8 0 0 0 1.7 1l.4 2.5c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.4-2.5a7.8 7.8 0 0 0 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6l-2-1.6Z"
-                stroke="currentColor"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-          </Link>
+              <svg
+                aria-hidden="true"
+                fill="none"
+                height="20"
+                viewBox="0 0 24 24"
+                width="20"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M19.4 15a8.2 8.2 0 0 0 .1-1 8.2 8.2 0 0 0-.1-1l2-1.6a.5.5 0 0 0 .1-.6l-1.9-3.3a.5.5 0 0 0-.6-.2l-2.4 1a7.8 7.8 0 0 0-1.7-1l-.4-2.5a.5.5 0 0 0-.5-.4H10a.5.5 0 0 0-.5.4l-.4 2.5a7.8 7.8 0 0 0-1.7 1l-2.4-1a.5.5 0 0 0-.6.2L2.5 10a.5.5 0 0 0 .1.6l2 1.6a8.2 8.2 0 0 0-.1 1 8.2 8.2 0 0 0 .1 1l-2 1.6a.5.5 0 0 0-.1.6l1.9 3.3c.1.2.4.3.6.2l2.4-1a7.8 7.8 0 0 0 1.7 1l.4 2.5c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.4-2.5a7.8 7.8 0 0 0 1.7-1l2.4 1c.2.1.5 0 .6-.2l1.9-3.3a.5.5 0 0 0-.1-.6l-2-1.6Z"
+                  stroke="currentColor"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </Link>
+          </div>
         </header>
 
-        <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-x-0 bottom-0 top-14">
           <section
             ref={scrollRef}
             data-scrolling={isScrolling ? "true" : "false"}
-            className="chat-scrollbar min-h-0 h-full overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+            className="chat-scrollbar h-full min-h-0 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
             onScroll={handleScroll}
           >
             <LiveMessageList
@@ -492,9 +491,9 @@ export function ChatShell({
 
         <footer
           ref={composerRef}
-          className="shrink-0 border-t border-[#22303D] bg-[#17212B] px-3 py-2 sm:px-4"
+          className="fixed bottom-0 left-0 right-0 z-20 border-t border-[#22303D] bg-[#17212B]"
         >
-          <div className="max-h-[160px] overflow-y-auto">
+          <div className="mx-auto max-h-[160px] w-full max-w-[960px] overflow-y-auto px-3 py-2 sm:px-4">
             {editDraft ? (
               <MessageComposer
                 key={`edit-${editDraft.messageId}`}
