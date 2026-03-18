@@ -61,9 +61,11 @@ export function ChatShell({
   const latestInsertRef = useRef<string | null>(null);
   const didInitialScrollRef = useRef(false);
   const isAtBottomRef = useRef(true);
+  const scrollActivityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [unseenCount, setUnseenCount] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isScrolling, setIsScrolling] = useState(false);
 
   const [editDraft, setEditDraft] = useState<ChatEditDraft>(null);
   const [modalState, setModalState] = useState<ChatModalState>(null);
@@ -120,6 +122,10 @@ export function ChatShell({
     const objectUrlByClientId = objectUrlByClientIdRef.current;
 
     return () => {
+      if (scrollActivityTimeoutRef.current) {
+        clearTimeout(scrollActivityTimeoutRef.current);
+      }
+
       for (const objectUrl of objectUrlByClientId.values()) {
         URL.revokeObjectURL(objectUrl);
       }
@@ -148,6 +154,15 @@ export function ChatShell({
   }, []);
 
   const handleScroll = useCallback(() => {
+    setIsScrolling(true);
+    if (scrollActivityTimeoutRef.current) {
+      clearTimeout(scrollActivityTimeoutRef.current);
+    }
+    scrollActivityTimeoutRef.current = setTimeout(() => {
+      setIsScrolling(false);
+      scrollActivityTimeoutRef.current = null;
+    }, 700);
+
     const nextIsAtBottom = computeIsAtBottom();
     isAtBottomRef.current = nextIsAtBottom;
     setIsAtBottom(nextIsAtBottom);
@@ -358,8 +373,7 @@ export function ChatShell({
       <div className="mx-auto flex h-full w-full max-w-[960px] flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#22303D] bg-[#17212B] px-3 sm:px-4">
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold leading-5">Экспресс-чат</h1>
-            <p className="truncate text-xs text-[#8FA1B3]">{userDisplayName}</p>
+            <h1 className="truncate text-2xl font-semibold leading-tight sm:text-3xl">Экспресс-чат</h1>
           </div>
 
           <Link
@@ -392,7 +406,8 @@ export function ChatShell({
 
         <section
           ref={scrollRef}
-          className="relative min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
+          data-scrolling={isScrolling ? "true" : "false"}
+          className="chat-scrollbar relative min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4"
           onScroll={handleScroll}
         >
           <LiveMessageList
