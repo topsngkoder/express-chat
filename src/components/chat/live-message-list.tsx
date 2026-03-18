@@ -147,6 +147,7 @@ export function LiveMessageList({
   scrollContainerRef,
   onRealtimeInsert,
   onReplyMessage,
+  onNavigateToReply,
   onEditMessage,
   onDeleteMessage,
 }: {
@@ -158,6 +159,7 @@ export function LiveMessageList({
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
   onRealtimeInsert?: (message: RenderedMessage) => void;
   onReplyMessage?: (message: RenderedMessage) => void;
+  onNavigateToReply?: (replyToMessageId: string) => void;
   onEditMessage?: (messageId: string, initialText: string | null, hasImage: boolean) => void;
   onDeleteMessage?: (messageId: string) => void;
 }) {
@@ -406,6 +408,7 @@ export function LiveMessageList({
         messages={messages}
         onLoadOlder={handleLoadOlder}
         onReplyMessage={onReplyMessage}
+        onNavigateToReply={onNavigateToReply}
         onEditMessage={onEditMessage}
         onDeleteMessage={onDeleteMessage}
       />

@@ -283,6 +283,13 @@ export function ChatShell({
     setActiveReplyDraft(buildReplySnapshotFromMessage(message));
   }, []);
 
+  const handleNavigateToReply = useCallback((replyToMessageId: string) => {
+    // TODO: Implement navigation to reply target
+    console.log("Navigate to reply:", replyToMessageId);
+  }, []);
+
+  void handleNavigateToReply; // Prevent unused variable warning
+
   const handleRequestEdit = useCallback(
     (messageId: string, initialText: string | null, hasImage: boolean) => {
       setActiveReplyDraft(null);
@@ -479,6 +486,7 @@ export function ChatShell({
               onRealtimeInsert={handleRealtimeInsert}
               onEditMessage={handleRequestEdit}
               onReplyMessage={handleRequestReply}
+              onNavigateToReply={handleNavigateToReply}
               onDeleteMessage={handleRequestDelete}
             />
 

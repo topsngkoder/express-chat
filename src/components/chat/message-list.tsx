@@ -11,6 +11,7 @@ type MessageListProps = {
   loadingOlder?: boolean;
   onLoadOlder?: () => void;
   onReplyMessage?: (message: RenderedMessage) => void;
+  onNavigateToReply?: (replyToMessageId: string) => void;
   onEditMessage?: (messageId: string, initialText: string | null, hasImage: boolean) => void;
   onDeleteMessage?: (messageId: string) => void;
 };
@@ -278,6 +279,35 @@ export function MessageList({
                           {message.senderName}
                         </p>
                       ) : null}
+
+                      {message.replyTo ? (
+                        <div
+                          className={`mb-2 flex gap-2 rounded-lg p-2 ${
+                            message.replyTo.isNavigable
+                              ? "cursor-pointer bg-[#22303D]/50 hover:bg-[#22303D]/70"
+                              : "bg-[#22303D]/30"
+                          }`}
+                          onClick={
+                            message.replyTo.isNavigable && message.replyTo.messageId
+                              ? () => onNavigateToReply?.(message.replyTo!.messageId!)
+                              : undefined
+                          }
+                        >
+                          <div
+                            className="h-full w-[3px] shrink-0 rounded-full"
+                            style={{ backgroundColor: senderNameColor ?? "#4CC9F0" }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold leading-4 text-[#E6EEF7]">
+                              {message.replyTo.senderName}
+                            </p>
+                            <p className="truncate text-xs leading-4 text-[#B7C9DA]">
+                              {message.replyTo.previewText}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+
                       {message.image ? (
                         <div className={message.text ? "overflow-hidden rounded-xl" : "overflow-hidden rounded-xl"}>
                           <img
