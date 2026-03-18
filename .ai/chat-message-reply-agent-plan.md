@@ -129,10 +129,10 @@
 
 ### I. Стабилизация UX и a11y
 
-- [ ] **I1**: `aria-label="Ответить на сообщение"` на desktop action button.
-- [ ] **I2**: Текст `Ответить` в touch menu.
-- [ ] **I3**: Корректный pointer/cursor state у navigable / non-navigable quote block.
-- [ ] **I4**: Учет `prefers-reduced-motion` при scroll.
+- [x] **I1**: `aria-label="Ответить на сообщение"` на desktop action button.
+- [x] **I2**: Текст `Ответить` в touch menu.
+- [x] **I3**: Корректный pointer/cursor state у navigable / non-navigable quote block.
+- [x] **I4**: Учет `prefers-reduced-motion` при scroll. (реализовано в `scrollToMessageAndHighlight`: `matchMedia("(prefers-reduced-motion: reduce)")` -> `behavior: "auto"` иначе `"smooth"`.)
 
 Дополнение (bugfix по UX):
 
