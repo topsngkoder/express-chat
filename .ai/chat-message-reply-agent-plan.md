@@ -100,6 +100,10 @@
 - [x] **E3**: Разрешить reply и для own, и для foreign confirmed messages.
 - [x] **E4**: Запретить reply для optimistic/pending local messages.
 
+Примечание по UX (уточнение от пользователя):
+
+- На мобильных устройствах по **обычному клику** по bubble должно всплывать **то же окно действий**, что и на десктопе (как на скриншоте), без long-press.
+
 ### F. Reply state в shell/composer
 
 - [ ] **F1**: Добавить shell-state активного ответа.
